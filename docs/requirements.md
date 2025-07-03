@@ -372,9 +372,97 @@ will be implemented. The focus here will be on breadth instead of deep.
 
 2. **configuration**: 
     - [ ] Implement a parser for the configuration files which will be
-      written in JSON format. The specification is:
+      written in JSON format. The specification of the configuration (not
+      necessarily in JSON) is:
       ```
-      TODO...
+      - title: string
+      - [grading]:{
+        - [mode]: "absolute" | "weighted" (default)
+        - [logging_mode]: "silent" | "normal" (default) | "verbose"
+      } 
+      - [report]:{
+        - [is_verbose]: bool (default: false)
+        - [output]: from {"txt", "stdout" (default)}
+      }
+      - [input]:{
+        // At the moment, only this option will be available   
+        - [target_program]: string (default:target)
+      }
 
+      - sections:{
+        - <section_name:string>+:{
+            // Must not be empty 
+            - unit_tests*:{
+                [env]: {
+                    <env_variable_name:string>+: string,
+                }
+                [setup]: [
+                    <command:string>+,
+                ]
+                [teardown]:{
+                    <command:string>+,
+                }
+                // Table test:
+                - <program_name:string>*:[
+                    // The header is a list of possible unit test
+                    // elements. Each unit test of this list will follow
+                    // the header convention. The header must not have
+                    // duplicate elements.
+                    // Example: ["args", "stdout", "weight"]
+                    - (list)[<header_element: "args", "stdout", "stderr", "status", "weight" >+],
+                    // The test values must be filled based on the
+                    // header. 
+                    // Example: 
+                    // ["args", "stdout", "weight"]
+                    // ["arg1", "res1", "1"]
+                    // ["arg2", "res2", "2"]
+                    // ["arg3", "res3", "3"]
+                    - (list)[<test_values: "args":string, "stdout":string, "stderr":string, "status":int, "weight":int >+],
+                ]
+
+                // Detailed test:
+                - <program_name:string>*:[
+                    {
+                        [args]:string,
+                        [stdout]:string,
+                        [stderr]:string,
+                        [status]:int,
+                        [weight]:int,
+                    }+
+                ]
+
+            },
+        }
+        
+      }
       ```
+3. **input**: This module, at this stage, will be very simple. The only
+   type of input that will be accepted is **executable**. Thus, there
+   will not have **compilation** or **interpretation** at this point.
+   Also, no heuristics will be implemented yet, it will assume the file
+   is an executable.
+    - [ ] Implement the functionality for validating the executable
+      input. The user will input the path for the executable as argument for the
+      CLI, which will be passed to this module, which will validate the
+      executable (File exists, readable, executable permissions, not directory, not empty,  path length limits)
+
+4. **grading**: Only the unit testing functionality will be implemented
+   at this stage.
+    - [ ] Implement the functionality for grading the user program given
+      a configuration file described in `Part1.2`. In this step, the
+      `assert_cmd` crate may be very helpful.
+    - [ ] Implement both **absolute** and **weighted** mode for grading. 
+        - **absolute**: the user will get 100% of the score only if
+          **all tests are passed**.
+        - **weighted**: each test will have a weight (defaults to 1, if
+          not specified) and the final score will be: sum of weights of
+          tests passed of a total of sum of every weight.
+
+    - [ ] Implement logging (not for programmers, something more visual:
+      progress bar, checks, colors, etc). Crates to look: indicatif,
+      console. 
+5. **report**: after grading, this module will be responsible for
+   generating the final report.
+    - [ ] Generate report that will be printed to **stdout** or **txt**
+      file. The report may be verbose or not.
 
