@@ -36,11 +36,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli_grader"
+name = "clgrader"
 version = "0.1.0"
 dependencies = [
  "assert_cmd",
+ "cli_grader",
 ]
+
+[[package]]
+name = "cli_grader"
+version = "0.1.0"
 
 [[package]]
 name = "difflib"

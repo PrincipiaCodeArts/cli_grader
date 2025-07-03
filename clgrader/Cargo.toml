@@ -1,0 +1,10 @@
+[package]
+name = "clgrader"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cli_grader = { path = "../cli_grader" }
+
+[dev-dependencies]
+assert_cmd = "2.0.17"

@@ -1,6 +1,6 @@
 use assert_cmd::Command;
 
-const EXECUTABLE_NAME: &str = "cli_grader";
+const EXECUTABLE_NAME: &str = "clgrader";
 
 #[test]
 fn should_return_successfully() {

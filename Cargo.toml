@@ -1,9 +1,8 @@
-[package]
-name = "cli_grader"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
 
-[dependencies]
+members = [ "clgrader" , "cli_grader"]
 
-[dev-dependencies]
-assert_cmd = "2.0.17"
+
+
+
