@@ -1,4 +1,3 @@
-
 # Description
 The goal of this package/bin is to allow instructors/teachers to
 automatically assess their students' CLI (command line interface) 
@@ -11,48 +10,60 @@ the possibility of more advanced configuration.
 
 
 # High Level Complete Specification
-This section gives an idea of the maximum scope that this project may
-reach. Any item found here is not necessarily implemented yet and maybe
-never will. 
+This section outlines the project's maximum potential scope. Items found
+here may or may not be implemented. 
 
-It is interesting to have an idea of the maximum scope of a
-project to modulate and guide the development process. For example, some
-early decisions may be made to make it easier for a possible future expansion
-or the opposite, maybe the application will never reach some future
-status and that allows some kinds of optimizations in the development
-process, avoiding unnecessary complexities. 
-
-<TODO reviewing>
+Being aware of the maximum scope of a project can help during the
+development process. Early architectural decisions can help avoiding
+unnecessary complexities, given some features will never be implemented,
+or embracing the necessary ones, given other features are planned to be
+implemented.
 
 Also, given that a detailed and complete specification from the
 beginning of a software project is not an easy thing to do, only an
-informal and high level specification will be given. Also, everything
-in this section related to `how` things should be done is more of a
-suggestion than a rigid demand.
+informal and high level specification will be given. Everything here 
+related to `how` things should be done is more of a suggestion than a 
+requirement.
 
 ## Motivation
-This tool will be used to **test and assess programming assignment artifacts**, 
-automating part of the process. An instructor will create an **assessment
-configuration artifact** and will use the this program to **grade** his
-students' programs/source code. The results will be generated as a
-a **report artifact**.
+This tool will be used to **assess programming assignment artifacts** in
+the context of programming courses and classes, automating part of the 
+process. The program will be fed with a **configuration artifact**,
+created by the instructor, and with the student's **CLI assignment
+program/source code**, generating a detailed **report artifact** with the
+results of the grading process. 
 
-Examples of CLI programs that could be tested:
-    - Easy (only basic unit tests with exit status code, stdout, etc):
-      echo, calculators, simple CLI programs that receive input and
-      return textual output.
-    - Medium (more advanced unit testing, timeout/timer functionality,
-      random input, more advanced output checking): timer, random number
-      generator, lexer, parser. 
-    - Advanced (store previous execution states, performance assessment,
-      file system, network, mock, etc): http client, grep, data base
-      engine.
-    - Very advanced/out of scope (concurrency test, distributed
-      algorithms, shared memory, etc)... 
+Examples of CLI programs that could be tested by CLI grader:
+    - **Easy** (basic unit tests with exit status, stdout/stderr validation, 
+    simple args): echo, basic calculators, text formatters, simple data 
+    converters, hello world variants, unit converters, temperature 
+    converter, grade calculator, simple cipher (Caesar), number base 
+    converter, BMI calculator, tip calculator, word counter, simple text 
+    encryptor/decryptor, text processors (to_uppercase, to_lowercase, etc).
+    - **Medium** (timeout handling, random input generation, advanced 
+    output parsing, complex args): timer, stopwatch, random generators, 
+    basic lexers/parsers, password generator, simple compiler/interpreter
+    for basic expressions.
+    - **Advanced** (state persistence, performance testing, file I/O,
+    network operations): cat, grep, find, wc, http clients, file 
+    compressors, simple database engines, log analyzers, chess engine, 
+    simple version control system, backup utility, network port scanner, 
+    basic web server, simple programming language interpreter, data 
+    structure and algorithm tool, expense tracker, todo list, contact manager, 
+    simple games (guess the number), hangman game, tic-tac-toe, simple 
+    chatbot, text-based adventure game, quiz application, maze solver, 
+    sudoku validator
+    - **Very advanced/out of scope** (concurrency, distributed systems, shared
+    memory): multi-threaded servers, distributed algorithms, parallel
+    processing tools, distributed file system, peer-to-peer client,
+    blockchain simulator, distributed consensus algorithms
+
+Obs.: The programs out of scope should not be assessed using this tool.
 
 ## Generic Specifications
 1. This program will be created to test CLI applications with the focus on
-   learning environment, thus, **it is not a professional software testing tool**.
+   learning environment, thus, **it is not a professional software testing
+   tool**.
 2. This application will be **modular** and each module should be decoupled
    from each other as much as possible. 
 3. This is a **CLI tool** and building a GUI/TUI is not a priority, even
@@ -70,21 +81,24 @@ Examples of CLI programs that could be tested:
    will not run on any production/critical environment, only the necessary 
    for a decent application/crate will be provided, the user must be aware of
    this tool's limitations and must be responsible for any improper use.
-   It would be interesting to give the option to execute the tests in a
+   This must be clear to the user. Maybe, a dedicated section in the
+   documentation, with suggestions and good security practices.
+   - It would be interesting to give the option to execute the tests in a
    sandbox environment.
 7. This tool must be **well tested**, specially its critical parts 
    (grading and generating reports). **Correctness** is obviously a crucial 
    requirement. Remember, someone else's grade may be defined by this tool.
 8. Although implemented in Rust (🦀❤️), this tool is **agnostic in terms
-   of programming languages that were used to create the CLI programs it
-   grades**. 
+   of programming languages that were used to compile/interpret the CLI 
+   programs which it grades**. 
 9. This program grades CLI applications, but it does necessarily need to
    receive them already compiled. It will be able to **automate the
    compilation process of the target programs** too. But, once 
    compiled/interpreted, the behavior of the target program will be as a
    normal CLI application.
-   - Main compiled languages supported: C, C++, Rust, Go, TypeScript
-   - Main interpreted/bytecode languages supported: Python, JavaScript
+   - Main compiled languages supported: C, C++, Rust, Go, TypeScript,
+     Dart
+   - Main interpreted/bytecode languages supported: Java, Python, JavaScript
 10. The **user experience** will also be a priority.
     - This includes good error handling and diagnostics.
 11. **Public API** and any obscure/hard part of the source code of this program
@@ -96,41 +110,42 @@ The main modules that compose this application are:
 - **cli**: this is the cli related part of the application, including the
   entry point (main.rs), its commands, all the structure that will
   orchestrate the application.
-  - The cli will be able to execute only one test or a batch of tests at
-    the same time.
+  - The cli will be able to grade either one student's program or a **batch 
+  of students' programs** at the same time.
 - **configuration**: this module will be responsible for parsing the
   input configuration from the instructor. It may parse multiple types
-  of inputs: JSON, YAML and a specific DSL. After parsing the
+  of inputs: **JSON, YAML and a specific DSL**. After parsing the
   configuration file, it will create a configuration data structure that
   will be used by other parts of the application. Other functions of
   this element are;
-  - Check the correctness of a configuration file.
-  - Generate a template for the configuration file.
-  - Generate a public version of a configuration file which may be used
-    by the students to run public tests on during the development of the
+  - **Check the correctness** of a configuration file.
+  - **Generate a template** for the configuration file.
+  - **Generate a public version of a configuration file** which may be used
+    by the students to run public tests during the development of the
     assignment.
-- **input**: this part is focused on implementing multiple strategies
-  for compiling/interpreting the user input as source code. It generates
+- **input**: this part is focused on implementing multiple **strategies
+  for compiling/interpreting the user input** as source code. It generates
   a command ready to be executed in the tests. For example, if it is a
-  python source code, a command like: "python program.py" will be
+  python source code, a command like: `python program.py` will be
   provided as the strategy to be used to execute the student's CLI.
   - It will be able to receive a repository url and then clone the code
   - If no specific argument is given, this program should recognize the
-    strategy to use using some reasonable heuristics: file extension,
-    etc. For example: `clgrader conf.json program.py`
+    best strategy using some reasonable heuristics: file extension,
+    etc. For example: `clgrader conf.json program.py` should
+    automatically recognize that the strategy to be used is `python`
   - May also analyze source code to get information that will compose
-    the grade.
-- **grader**: this is the main core of this application. It runs
-  the user's artifacts (programs and configuration files) against the 
-  tests created by the professor. It will generate all the necessary
-  information for the report module to use. 
+    the grade. The only thing I can think of is the use of lints. Any
+    important rule that is broken, generates a negative score, something
+    like that.
+- **grader**: This part of the program effectively performs the grading process on
+  the student's input program. All the instructions of how to perform
+  the tests are in the configuration file.
   It will execute a complete test session, with target programs,
   artifacts, environment variables, name, grading configurations, and
   sections/main section. Each section may have multiple testing
   elements.
-  The grading system may be absolute (100% or 0%) or not (weighted).
-  The grader will allow different strategies for testing the target
-  program.
+  The grading system may be either **absolute (100% or 0%) or weighted**.
+  It will allow different strategies for testing the target program.
   - **Unit test**: This is the most simple and fast way to create the
     test cases. It will allow **setup and tear down configurations**. Each
     test case will be ran in isolation and will be focused on only one
@@ -149,17 +164,17 @@ The main modules that compose this application are:
     }
     ```
     The unit test will be enough for a lot of use cases. Any kind of
-    assignment of the type: `in -> out` which does not require complex
-    shell interaction will be covered. 
+    assignment of the type: `executable + args -> out` which does not 
+    require complex shell interaction will be covered. 
     Another example would be:
     ```json
     {
         "unit_tests":{
-            "program1":{
-                "environment": {
-                    "HOME": "/tmp/student",
-                    "PATH": "/usr/bin:/bin"
-                },
+            "env": {
+                "HOME": "/tmp/student",
+                "PATH": "/usr/bin:/bin"
+            },
+            "program1":[
                 {
                     "args": "\"hello  there\"", 
                     "stdout": "hello  there", 
@@ -172,8 +187,16 @@ The main modules that compose this application are:
                     "weight":2
                     
                 },
-                {"args": {"permutations":["arg1", "-arg2 abc"]}, "stdout": "other example\n", "exit":{"between":[1, 5]}}
-            }
+                {
+                    "args": {
+                        "permutations":["arg1", "-arg2 abc"]
+                    }, 
+                    "stdout": "other example\n", 
+                    "exit":{
+                        "between":[1, 5]
+                    }
+                }
+            ]
         }
     }
     ```
@@ -264,97 +287,14 @@ The main modules that compose this application are:
   The structure of the report will be based on the structure of the
   configuration file and the verbosity.
 
-
-
-## Examples
-This section will describe in an informal way most of the
-functionalities desired for this application. 
-
-- A programming teacher wants to create tests for his students. He
-  describes the assessment configuration using a JSON file with some
-  parts of the file being labeled as pub (public). The public section
-  (or parts) will be available for his students to use in their
-  development. The teacher does not want all his tests being available
-  to his students, otherwise he thinks they could cheat easier with the
-  tests available. He creates the public (incomplete) tests from his 
-  (complete) private version with one single command.
-- An assessment is composed of meta data and sections. Each section
-  may have actions, assertions, and meta data. Actions are shell commands, which may
-  include the execution of the (or some of the) program sent by the
-  student. 
-- An instructor wants to test a cli assignment which implements
-  the `echo` functionality. He creates the following assessment
-  configuration:
-  ```json
-  {
-      "":"// It may sound a little verbose (and it is) to use JSON, but",
-      "":"// it is simpler than creating an specific DSL implementation.",
-      "name": "Assignment 1: Echo",
-      "grading":{
-          "":"// By default, grading is weighted and each assertion is worth 1 point",
-          "":"// You can set weight for any section, unit test, or",
-          "":"// integrated tests",
-          "":"// (comments) for now, a binary grading / weighted grading is enough",
-          "is_binary":true 
-      },
-      "report":{
-          "is_verbose":false
-      },
-
-      "":"// The executable must be passed to the CLI-grader using",
-      "":"// key-value or --executables -e list.",
-      "executables":[
-          "student_cli"
-      ],
-      "sections": [
-          "sanity_check": {
-              "is_public": true,
-              "unit_tests":[
-                  "student_cli":[
-                      {"args": "hello  there", "stdout": "hello there"},
-                      {"args": "hello there", "stdout": "hello there"}
-                  ]
-              ]
-          },
-          "complete assessment": {
-              "unit_tests":[
-                  "setUp":[
-                    "command 1",
-                    "command 2"
-                  ],
-                  "tearDown":[
-                    "command 1"
-                  ],
-                  "student_cli":[
-                      {"args": "\"hello  there\"", "stdout": "hello  there"},
-                      {"args": "other example\n", "stdout": "other example\n"}
-                  ]
-              ],
-              "integrated_tests":[
-                  "student_cli":[
-                      {"args": "\"hello  there\"", "stdout": "hello  there"},
-                      {"args": "other example\n", "stdout": "other example\n"}
-                  ]
-              ]
-          }
-      ]
-  }
-  ```
-
-
-
-
-
-
 # Requirements
-
 This part of the document contains a more detailed and formal
 specification and will be the main guide for the implementation.
 
 ## Part 1
 In the end of this part, you will have a very simple, but functional
 version of the application. Only a limited subset of the application
-will be implemented. The focus here will be on breadth instead of deep.
+will be implemented. The focus here will be on breadth instead of depth.
 
 1. **cli**: 
     - [ ] Create all the basic structure for the CLI: lexer/parser,
@@ -369,6 +309,9 @@ will be implemented. The focus here will be on breadth instead of deep.
     - [ ] Implement the basic usage command: `clgrader <CONFIGURATION_FILE> <TARGET_PROGRAM>`.
       In other words, this will be the complete orchestration of each
       component implemented in this stage.
+    - [ ] Implement logging (not for programmers, something more visual:
+      progress bar, checks, colors, etc), specially on grading process. 
+      Crates to look: indicatif, console. 
 
 2. **configuration**: 
     - [ ] Implement a parser for the configuration files which will be
@@ -376,6 +319,7 @@ will be implemented. The focus here will be on breadth instead of deep.
       necessarily in JSON) is:
       ```
       - title: string
+      - [author]:string
       - [grading]:{
         - [mode]: "absolute" | "weighted" (default)
         - [logging_mode]: "silent" | "normal" (default) | "verbose"
@@ -390,20 +334,23 @@ will be implemented. The focus here will be on breadth instead of deep.
       }
 
       - sections:{
-        - <section_name:string>+:{
+        - <section_name>+:{
+            // Each section may have a base weight.
+            [weight]:int,
             // Must not be empty 
             - unit_tests*:{
                 [env]: {
                     <env_variable_name:string>+: string,
                 }
                 [setup]: [
-                    <command:string>+,
+                    <command>+,
                 ]
                 [teardown]:{
-                    <command:string>+,
+                    <command>+,
                 }
+                [weight]:int,
                 // Table test:
-                - <program_name:string>*:[
+                - <program_name>*:[
                     // The header is a list of possible unit test
                     // elements. Each unit test of this list will follow
                     // the header convention. The header must not have
@@ -421,7 +368,7 @@ will be implemented. The focus here will be on breadth instead of deep.
                 ]
 
                 // Detailed test:
-                - <program_name:string>*:[
+                - <program_name>*:[
                     {
                         [args]:string,
                         [stdout]:string,
@@ -436,15 +383,31 @@ will be implemented. The focus here will be on breadth instead of deep.
         
       }
       ```
+Below, we have a table with all the 
+
+| Symbol | Meaning | Example |
+|--------|---------|---------|
+| `[field]` | **Optional field** | `[author]` - author field is optional |
+| `field` | **Required field** | `title` - title field is mandatory |
+| `field*` | **Zero or more** | `unit_tests*` - can have 0+ unit tests |
+| `field+` | **One or more** | `<command>+` - requires at least 1 command |
+| `<name>` | **key** | `<section_name>` - a key for a value|
+| `"val1" \| "val2"` | **Enum options** | `"absolute" \| "weighted"` - must be one of these |
+| `(default)` | **Default value** | `"normal" (default)` - uses "normal" if not specified |
+| `(list)` | **Array/list structure** | Table test rows are arrays |
+| `{}` | **Object/nested structure** | Contains sub-fields |
+| `[]` | **Array structure** | List of items |
+
 3. **input**: This module, at this stage, will be very simple. The only
    type of input that will be accepted is **executable**. Thus, there
-   will not have **compilation** or **interpretation** at this point.
+   will be no **compilation** or **interpretation** at this point.
    Also, no heuristics will be implemented yet, it will assume the file
    is an executable.
     - [ ] Implement the functionality for validating the executable
       input. The user will input the path for the executable as argument for the
       CLI, which will be passed to this module, which will validate the
-      executable (File exists, readable, executable permissions, not directory, not empty,  path length limits)
+      executable (File exists, readable, executable permissions, not 
+      directory, not empty,  path length limits)
 
 4. **grading**: Only the unit testing functionality will be implemented
    at this stage.
@@ -455,14 +418,16 @@ will be implemented. The focus here will be on breadth instead of deep.
         - **absolute**: the user will get 100% of the score only if
           **all tests are passed**.
         - **weighted**: each test will have a weight (defaults to 1, if
-          not specified) and the final score will be: sum of weights of
-          tests passed of a total of sum of every weight.
-
-    - [ ] Implement logging (not for programmers, something more visual:
-      progress bar, checks, colors, etc). Crates to look: indicatif,
-      console. 
+          not specified) and the final score will be the sum of weights of
+          tests passed. The minimum is 0 and the maximum is the sum of
+          weights of all tests.
 5. **report**: after grading, this module will be responsible for
    generating the final report.
     - [ ] Generate report that will be printed to **stdout** or **txt**
       file. The report may be verbose or not.
+6. **Generic requirements**: 
+    - [ ] Implement logging
+    - [ ] Implement error handling
+    - [ ] Add documentation for public API
+
 
