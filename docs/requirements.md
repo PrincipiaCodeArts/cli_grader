@@ -34,17 +34,17 @@ program/source code**, generating a detailed **report artifact** with the
 results of the grading process. 
 
 Examples of CLI programs that could be tested by CLI grader:
-    - **Easy** (basic unit tests with exit status, stdout/stderr validation, 
+- **Easy** (basic unit tests with exit status, stdout/stderr validation, 
     simple args): echo, basic calculators, text formatters, simple data 
     converters, hello world variants, unit converters, temperature 
     converter, grade calculator, simple cipher (Caesar), number base 
     converter, BMI calculator, tip calculator, word counter, simple text 
-    encryptor/decryptor, text processors (to_uppercase, to_lowercase, etc).
-    - **Medium** (timeout handling, random input generation, advanced 
+    encryptor/decryptor, text processors (to_uppercase, to_lowercase, etc). 
+- **Medium** (timeout handling, random input generation, advanced 
     output parsing, complex args): timer, stopwatch, random generators, 
     basic lexers/parsers, password generator, simple compiler/interpreter
     for basic expressions.
-    - **Advanced** (state persistence, performance testing, file I/O,
+- **Advanced** (state persistence, performance testing, file I/O,
     network operations): cat, grep, find, wc, http clients, file 
     compressors, simple database engines, log analyzers, chess engine, 
     simple version control system, backup utility, network port scanner, 
@@ -53,7 +53,7 @@ Examples of CLI programs that could be tested by CLI grader:
     simple games (guess the number), hangman game, tic-tac-toe, simple 
     chatbot, text-based adventure game, quiz application, maze solver, 
     sudoku validator
-    - **Very advanced/out of scope** (concurrency, distributed systems, shared
+- **Very advanced/out of scope** (concurrency, distributed systems, shared
     memory): multi-threaded servers, distributed algorithms, parallel
     processing tools, distributed file system, peer-to-peer client,
     blockchain simulator, distributed consensus algorithms
