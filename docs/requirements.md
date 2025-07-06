@@ -320,9 +320,9 @@ will be implemented. The focus here will be on breadth instead of depth.
       ```
       - title: string
       - [author]:string
+      - [logging_mode]: "silent" | "normal" (default) | "verbose"
       - [grading]:{
         - [mode]: "absolute" | "weighted" (default)
-        - [logging_mode]: "silent" | "normal" (default) | "verbose"
       } 
       - [report]:{
         - [is_verbose]: bool (default: false)
@@ -338,7 +338,7 @@ will be implemented. The focus here will be on breadth instead of depth.
             // Each section may have a base weight.
             [weight]:int,
             // Must not be empty 
-            - unit_tests*:{
+            - unit_tests:{
                 [env]: {
                     <env_variable_name:string>+: string,
                 }
@@ -348,7 +348,6 @@ will be implemented. The focus here will be on breadth instead of depth.
                 [teardown]:{
                     <command>+,
                 }
-                [weight]:int,
                 // Table test:
                 - <program_name>*:[
                     // The header is a list of possible unit test
@@ -356,7 +355,7 @@ will be implemented. The focus here will be on breadth instead of depth.
                     // the header convention. The header must not have
                     // duplicate elements.
                     // Example: ["args", "stdout", "weight"]
-                    - (list)[<header_element: "args", "stdout", "stderr", "status", "weight" >+],
+                    - (list)[<header_element: "args", "stdout", "stderr", "status", "weight", "name" >+],
                     // The test values must be filled based on the
                     // header. 
                     // Example: 
@@ -364,12 +363,13 @@ will be implemented. The focus here will be on breadth instead of depth.
                     // ["arg1", "res1", "1"]
                     // ["arg2", "res2", "2"]
                     // ["arg3", "res3", "3"]
-                    - (list)[<test_values: "args":string, "stdout":string, "stderr":string, "status":int, "weight":int >+],
+                    - (list)[<test_values: "args":string, "stdout":string, "stderr":string, "status":int, "weight":int, "name":string >+],
                 ]
 
                 // Detailed test:
                 - <program_name>*:[
                     {
+                        [name]:string,
                         [args]:string,
                         [stdout]:string,
                         [stderr]:string,
