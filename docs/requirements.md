@@ -333,8 +333,9 @@ will be implemented. The focus here will be on breadth instead of depth.
         - [target_program]: string (default:target)
       }
 
-      - sections:{
-        - <section_name>+:{
+      - sections:[
+        {
+            [name]:string,
             // Each section may have a base weight.
             [weight]:int,
             // Must not be empty 
@@ -348,40 +349,45 @@ will be implemented. The focus here will be on breadth instead of depth.
                 [teardown]:{
                     <command>+,
                 }
-                // Table test:
-                - <program_name>*:[
-                    // The header is a list of possible unit test
-                    // elements. Each unit test of this list will follow
-                    // the header convention. The header must not have
-                    // duplicate elements.
-                    // Example: ["args", "stdout", "weight"]
-                    - (list)[<header_element: "args", "stdout", "stderr", "status", "weight", "name" >+],
-                    // The test values must be filled based on the
-                    // header. 
-                    // Example: 
-                    // ["args", "stdout", "weight"]
-                    // ["arg1", "res1", "1"]
-                    // ["arg2", "res2", "2"]
-                    // ["arg3", "res3", "3"]
-                    - (list)[<test_values: "args":string, "stdout":string, "stderr":string, "status":int, "weight":int, "name":string >+],
-                ]
-
-                // Detailed test:
-                - <program_name>*:[
+                tests:[
                     {
                         [name]:string,
-                        [args]:string,
-                        [stdout]:string,
-                        [stderr]:string,
-                        [status]:int,
-                        [weight]:int,
-                    }+
+                        program_name:string,
+                        // Choose at least one of the following:
+                        // - `table` for table testing
+                        // - `detailed` for detailed testing
+                        table:[
+                            // The header is a list of possible unit test
+                            // elements. Each unit test of this list will follow
+                            // the header convention. The header must not have
+                            // duplicate elements.
+                            // Example: ["args", "stdout", "weight"]
+                            - (list)[<header_element: "args", "stdout", "stderr", "status", "weight", "name" >+],
+                            // The test values must be filled based on the
+                            // header. 
+                            // Example: 
+                            // ["args", "stdout", "weight"]
+                            // ["arg1", "res1", "1"]
+                            // ["arg2", "res2", "2"]
+                            // ["arg3", "res3", "3"]
+                            - (list)[<test_values: "args":string, "stdout":string, "stderr":string, "status":int, "weight":int, "name":string >+],
+                        ]
+                        detailed:[
+                            {
+                                [name]:string,
+                                [args]:string,
+                                [stdout]:string,
+                                [stderr]:string,
+                                [status]:int,
+                                [weight]:int,
+                            }+
+                        ]
+                    }*,
+                    
                 ]
-
             },
-        }
-        
-      }
+        }+
+      ]
       ```
 Below, we have a table with all the 
 
@@ -391,7 +397,6 @@ Below, we have a table with all the
 | `field` | **Required field** | `title` - title field is mandatory |
 | `field*` | **Zero or more** | `unit_tests*` - can have 0+ unit tests |
 | `field+` | **One or more** | `<command>+` - requires at least 1 command |
-| `<name>` | **key** | `<section_name>` - a key for a value|
 | `"val1" \| "val2"` | **Enum options** | `"absolute" \| "weighted"` - must be one of these |
 | `(default)` | **Default value** | `"normal" (default)` - uses "normal" if not specified |
 | `(list)` | **Array/list structure** | Table test rows are arrays |

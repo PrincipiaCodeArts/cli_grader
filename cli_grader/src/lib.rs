@@ -1,10 +1,10 @@
+/*
 mod configuration;
-
-mod grader;
-pub use grader::subtract;
-
 mod input;
 mod report;
+*/
+
+mod grader;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
