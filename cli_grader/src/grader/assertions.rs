@@ -27,17 +27,18 @@ struct ExpectedObtainedResult<T> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum ExecutionStatus {
+pub enum ExecutionStatus {
     Success,
     FailureWithStatus(i32),
     FailureBeforeExecution,
     FailureBeforeWait,
     FailureWithSignalTermination,
+    Undefined,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AssertionResult {
-    execution_status: Option<ExecutionStatus>,
+    execution_status: ExecutionStatus,
     name: String,
     passed: bool,
     weight: u32,
@@ -52,7 +53,7 @@ impl AssertionResult {
             name,
             weight,
             passed: false,
-            execution_status: None,
+            execution_status: ExecutionStatus::Undefined,
             stdout_diagnostics: None,
             stderr_diagnostics: None,
             status_diagnostics: None,
@@ -74,7 +75,7 @@ impl AssertionResult {
     }
 
     fn set_execution_status(&mut self, status: ExecutionStatus) {
-        self.execution_status = Some(status);
+        self.execution_status = status;
     }
 
     fn set_stdout_diagnostics(&mut self, expected: String, obtained: Option<String>) {
@@ -188,6 +189,19 @@ impl Assertion {
                 return assertion_result;
             }
         };
+        if !output.stdout.is_empty() {
+            debug!(
+                "- STDOUT: '{}'",
+                String::from_utf8_lossy(&output.stdout).replace('\n', "\\n")
+            );
+        }
+        if !output.stderr.is_empty() {
+            debug!(
+                "- STDERR: '{}'",
+                String::from_utf8_lossy(&output.stdout).replace('\n', "\\n")
+            );
+        }
+        debug!("Output details: {:?}", output);
 
         let mut passed = true;
         if output.status.success() {
@@ -274,7 +288,127 @@ impl Assertion {
         } else {
             info!("❌ Assertion not passed");
         }
+        info!("----------------------------------------------------------");
         assertion_result
+    }
+
+    /// Returns the expected result of the assertion `self` applied to some program
+    /// adjusted by its fields and the parameters of this function.
+    /// This is useful for testing purposes, avoiding manual building the assertion result.
+    ///
+    /// If `passed`, the assertion will be constructed without diagnostics. Otherwise, the
+    /// diagnostics must be defined by passing values to `obtained_stdout`,
+    /// `obtained_stderr`, and `obtained_status`.
+    ///
+    /// # Parameters
+    /// - `execution_status_if_no_status`: this parameter is mandatory when no status is
+    /// expected. In that situation, this execution status will be used as the expected one.
+    /// - `passed`: specify if it is expected to pass the assertion or not.
+    /// - `obtained_stdout`: specify the obtained stdout. This helps complementing the
+    /// stdout diagnostics.
+    /// - `obtained_stderr`: specify the obtained stderr. This helps complementing the
+    /// stderr diagnostics.
+    /// - `obtained_status`: specify the obtained status. This helps complementing the
+    /// status diagnostics.
+    #[cfg(test)]
+    pub fn expected_result(
+        &self,
+        execution_status_if_no_status: Option<ExecutionStatus>,
+        passed: bool,
+        obtained_stdout: Option<String>,
+        obtained_stderr: Option<String>,
+        obtained_status: Option<i32>,
+    ) -> AssertionResult {
+        let execution_status = if let Some(status) = self.status {
+            if status == 0 {
+                ExecutionStatus::Success
+            } else {
+                ExecutionStatus::FailureWithStatus(status)
+            }
+        } else {
+            execution_status_if_no_status
+                .expect("no status was defined, thus, execution status must be defined manually")
+        };
+        let stdout_diagnostics = if let Some(stdout) = self.stdout.clone() {
+            if passed {
+                None
+            } else {
+                Some(ExpectedObtainedResult {
+                    expected: stdout,
+                    obtained: obtained_stdout,
+                })
+            }
+        } else {
+            None
+        };
+        let stderr_diagnostics = if let Some(stderr) = self.stderr.clone() {
+            if passed {
+                None
+            } else {
+                Some(ExpectedObtainedResult {
+                    expected: stderr,
+                    obtained: obtained_stderr,
+                })
+            }
+        } else {
+            None
+        };
+        let status_diagnostics = if let Some(status) = self.status {
+            if passed {
+                None
+            } else {
+                Some(ExpectedObtainedResult {
+                    expected: status,
+                    obtained: obtained_status,
+                })
+            }
+        } else {
+            None
+        };
+        AssertionResult {
+            execution_status,
+            name: self.name.clone(),
+            passed,
+            weight: self.weight,
+            stdout_diagnostics,
+            stderr_diagnostics,
+            status_diagnostics,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_dummy(
+        id: u32,
+        with_stdin: bool,
+        with_stdout: bool,
+        with_stderr: bool,
+        status: Option<i32>,
+        weight: u32,
+    ) -> Self {
+        Self::new(
+            format!("name {id}"),
+            (0..4)
+                .into_iter()
+                .map(|i| format!("arg {}", i + id))
+                .collect(),
+            if with_stdin {
+                Some(format!("expected stdin: {id}"))
+            } else {
+                None
+            },
+            if with_stdout {
+                Some(format!("expected stdout: {id}"))
+            } else {
+                None
+            },
+            if with_stderr {
+                Some(format!("expected stderr: {id}"))
+            } else {
+                None
+            },
+            status,
+            weight,
+        )
     }
 }
 
@@ -310,7 +444,7 @@ mod tests {
             let result = not_passed_assertion.unsafe_assert_cmd(cmd);
             assert_eq!(
                 result.execution_status,
-                Some(ExecutionStatus::FailureBeforeExecution)
+                ExecutionStatus::FailureBeforeExecution
             );
             assert_eq!(result.name, assertion_name);
             assert_eq!(result.passed, false, "assertion should not pass");
@@ -370,7 +504,7 @@ mod tests {
             assert_eq!(
                 result,
                 AssertionResult {
-                    execution_status: Some(ExecutionStatus::Success),
+                    execution_status: ExecutionStatus::Success,
                     name: assertion_name.clone(),
                     passed: true,
                     weight: assertion_weight,
@@ -401,7 +535,7 @@ mod tests {
             assert_eq!(
                 result,
                 AssertionResult {
-                    execution_status: Some(ExecutionStatus::Success),
+                    execution_status: ExecutionStatus::Success,
                     name: assertion_name,
                     passed: false,
                     weight: assertion_weight,
@@ -448,7 +582,7 @@ mod tests {
             assert_eq!(
                 result,
                 AssertionResult {
-                    execution_status: Some(ExecutionStatus::Success),
+                    execution_status: ExecutionStatus::Success,
                     name: assertion_name.clone(),
                     passed: true,
                     weight: assertion_weight,
@@ -479,7 +613,7 @@ mod tests {
             assert_eq!(
                 result,
                 AssertionResult {
-                    execution_status: Some(ExecutionStatus::Success),
+                    execution_status: ExecutionStatus::Success,
                     name: assertion_name,
                     passed: false,
                     weight: assertion_weight,
