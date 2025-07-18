@@ -1,23 +1,25 @@
 use crate::grader::score::{GradingMode, Score};
 use crate::grader::{
-    assessment_modalities::unit_test::assertion::Assertion, os_interface::TargetProgram,
+    assessment_modalities::unit_test::assertion::Assertion, os_interface::CompiledProgram,
 };
 
 pub mod assertion;
 
+use crate::grader::os_interface::Executable;
 use assertion::AssertionResult;
+use std::fmt::Debug;
 use std::{fs, io, process};
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug)]
 pub struct ProgramUnitAssertions {
     name: String, // Default: `Unit testing <TargetProgram>`
-    program: TargetProgram,
+    executable: Box<dyn Executable>,
     assertions: Vec<Assertion>,
 }
 impl ProgramUnitAssertions {
-    pub fn new(name: String, program: TargetProgram) -> Self {
+    pub fn new(name: String, executable: Box<dyn Executable>) -> Self {
         Self {
             name,
-            program,
+            executable,
             assertions: vec![],
         }
     }
@@ -39,8 +41,11 @@ impl ProgramUnitAssertions {
         teardown: Vec<(String, Vec<String>)>,
         grading_mode: GradingMode,
     ) -> io::Result<ProgramUnitAssertionResults> {
-        let mut result =
-            ProgramUnitAssertionResults::new(self.name.clone(), self.program.clone(), grading_mode);
+        let mut result = ProgramUnitAssertionResults::new(
+            self.name.clone(),
+            self.executable.description(),
+            grading_mode,
+        );
         for assertion in self.assertions.iter() {
             let tmp_dir = match tempfile::tempdir() {
                 Ok(dir) => dir,
@@ -78,7 +83,7 @@ impl ProgramUnitAssertions {
             }
 
             // setup cmd
-            let mut cmd = process::Command::new(self.program.get_path());
+            let mut cmd = self.executable.new_cmd();
             if !inherited_parent_envs {
                 cmd.env_clear();
             }
@@ -109,16 +114,16 @@ impl ProgramUnitAssertions {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ProgramUnitAssertionResults {
     name: String,
-    program: TargetProgram,
+    executable_description: String,
     score: Score,
     assertion_results: Vec<AssertionResult>,
 }
 
 impl ProgramUnitAssertionResults {
-    pub fn new(name: String, program: TargetProgram, grading_mode: GradingMode) -> Self {
+    pub fn new(name: String, executable_description: String, grading_mode: GradingMode) -> Self {
         Self {
             name,
-            program,
+            executable_description,
             score: Score::default(grading_mode),
             assertion_results: vec![],
         }
@@ -145,7 +150,7 @@ impl ProgramUnitAssertionResults {
 
 // TODO (transform to struct): instead of enum, use a trait to define the interface
 // necessary to implement a Tests.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug)]
 pub enum Tests {
     UnitTest {
         envs: Vec<(String, String)>,
