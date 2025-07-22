@@ -17,7 +17,7 @@ use score::Score;
 // TODO (optimization opportunity): replace `String` with &'a str for the string
 // fields.
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct GradingSection {
     name: String, // Default: `Section <number>`
     weight: u32,  // Default: 1
@@ -65,7 +65,7 @@ impl GradingSectionResult {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct GradingConfig {
     name: String,
     author: String,
@@ -122,7 +122,7 @@ impl GradingResult {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct Grader<'a> {
     config: &'a GradingConfig,
 }
@@ -140,13 +140,113 @@ impl<'a> Grader<'a> {
 mod tests {
     use super::*;
 
+    mod grading_config_tests {
+        use super::*;
+        use crate::grader::{
+            assessment_modalities::unit_test::{assertion::Assertion, ProgramUnitAssertions},
+            os_interface::TargetProgram,
+        };
+        use std::vec;
+
+        #[test]
+        fn should_create_a_grading_config_with_two_grading_sections() {
+            let name = "config 1";
+            let author = "author 1";
+            let grading_mode = GradingMode::Absolute;
+            let mut config = GradingConfig::new(name.to_string(), author.to_string(), grading_mode);
+
+            assert_eq!(
+                (
+                    config.name.clone(),
+                    config.author.clone(),
+                    config.grading_mode
+                ),
+                (name.to_string(), author.to_string(), grading_mode)
+            );
+
+            // Add the first grading section
+            let section1_tests =
+                // TODO make internals from tests transparent.
+                Tests::new_unit_test(
+                    vec![("key1".to_string(), "value1".to_string())],
+                    true,
+                    vec![("file.txt".to_string(), "content 1".to_string())],
+                    vec![("cmd1".to_string(), vec![]), ("cmd2".to_string(), vec![])],
+                    vec![
+                        ("tr cmd1".to_string(), vec![]),
+                        ("tr cmd2".to_string(), vec![]),
+                    ],
+                    vec![
+                        ProgramUnitAssertions::new(
+                            "assertion group 1".to_string(),
+                            TargetProgram::new(
+                                 "program1".to_string(),
+                                 "cat".to_string(),
+                            ),
+                        )
+                        .with_assertion(Assertion::new_dummy(1, true, false, true, Some(2), 2))
+                        .with_assertion(Assertion::new_dummy(2, false, false, false, Some(2), 3)),
+                        ProgramUnitAssertions::new(
+                            "assertion group 2".to_string(),
+                            TargetProgram::new(
+                                 "program2".to_string(),
+                                 "echo".to_string(),
+                            ),
+                        )
+                        .with_assertion(Assertion::new_dummy(1, true, true, true, None, 2)),
+                    ],
+                );
+            let section1 = GradingSection::new("section 1".to_string(), 2, section1_tests);
+
+            config.add_grading_section(section1.clone());
+
+            assert_eq!(config.grading_sections, vec![section1.clone()]);
+
+            let section2_tests =
+                Tests::new_unit_test(
+                    vec![],
+                    false,
+                    vec![],
+                    vec![
+                        ("cmd1".to_string(), vec![]),
+                        ("cmd2".to_string(), vec![]),
+                        ("cmd3".to_string(), vec![]),
+                    ],
+                    vec![("tr cmd3".to_string(), vec![])],
+                    vec![
+                        ProgramUnitAssertions::new(
+                            "assertion group 3".to_string(),
+                            TargetProgram::new("program2".to_string(), "cat2".to_string()),
+                        )
+                        .with_assertion(Assertion::new_dummy(3, true, false, true, Some(2), 2))
+                        .with_assertion(Assertion::new_dummy(4, false, false, false, Some(2), 3))
+                        .with_assertion(Assertion::new_dummy(5, true, false, true, Some(2), 2)),
+                        ProgramUnitAssertions::new(
+                            "assertion group 4".to_string(),
+                            TargetProgram::new("program4".to_string(), "echo".to_string()),
+                        )
+                        .with_assertion(Assertion::new_dummy(6, true, true, true, None, 2)),
+                        ProgramUnitAssertions::new(
+                            "assertion group 5".to_string(),
+                            TargetProgram::new("program5".to_string(), "echo5".to_string()),
+                        )
+                        .with_assertion(Assertion::new_dummy(7, true, true, true, None, 2)),
+                    ],
+                );
+            let section2 = GradingSection::new("section 2".to_string(), 50, section2_tests);
+            config.add_grading_section(section2.clone());
+
+            assert_eq!(config.grading_sections, vec![section1, section2]);
+        }
+    }
+
     mod grader_tests {
         use super::*;
         use crate::grader::{
             assessment_modalities::unit_test::{
                 assertion::Assertion, ProgramUnitAssertionResults, ProgramUnitAssertions,
             },
-            os_interface::{CompiledProgram, Executable},
+            os_interface::TargetProgram,
         };
         use std::vec;
 
@@ -166,8 +266,7 @@ mod tests {
                 (name.to_string(), author.to_string(), grading_mode)
             );
             let program_unit_assertions_name = "Cat from file".to_string();
-            let target_program = CompiledProgram::new("program1".to_string(), "cat");
-            let target_program_copy = CompiledProgram::new("program1".to_string(), "cat");
+            let target_program = TargetProgram::new("program1".to_string(), "cat".to_string());
             // Add the first grading section
             let assertion1 = Assertion::new(
                 "should return \"hello world\"".to_string(),
@@ -200,14 +299,14 @@ mod tests {
                 vec![],
                 vec![ProgramUnitAssertions::new(
                     program_unit_assertions_name.clone(),
-                    Box::new(target_program_copy),
+                    target_program.clone(),
                 )
                 .with_assertion(assertion1)
                 .with_assertion(assertion2)],
             );
             let section1 = GradingSection::new("section 1".to_string(), 1, section1_tests);
 
-            config.add_grading_section(section1);
+            config.add_grading_section(section1.clone());
 
             let result = config.run_assessment();
 
@@ -233,7 +332,7 @@ mod tests {
                             },
                             assertion_per_program_results: vec![ProgramUnitAssertionResults::new(
                                 program_unit_assertions_name,
-                                target_program.description(),
+                                target_program,
                                 GradingMode::Weighted
                             )
                             .with_assertion_result(expected_assertion1)

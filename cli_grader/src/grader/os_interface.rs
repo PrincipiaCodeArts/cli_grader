@@ -2,40 +2,21 @@
 // changed to something more robust.
 // TODO (improve): maybe there is a better way to represent filesystem paths
 // other than `String`.
-
-use std::{ffi::OsStr, fmt::Debug, path::Path, process::Command};
+pub type Path = String;
 
 // Input
 // TODO (refactor): check the necessity to create a trait here.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct CompiledProgram<'a> {
+pub struct TargetProgram {
     name: String,
-    path: &'a Path,
+    path: Path,
 }
 
-impl<'a> CompiledProgram<'a> {
-    pub fn new<S: AsRef<OsStr> + ?Sized>(name: String, path: &'a S) -> Self {
-        Self {
-            name,
-            path: Path::new(path),
-        }
+impl TargetProgram {
+    pub fn new(name: String, path: Path) -> Self {
+        Self { name, path }
     }
     pub fn get_path(&self) -> &Path {
         &self.path
     }
-}
-
-impl<'a> Executable for CompiledProgram<'a> {
-    fn new_cmd(&self) -> Command {
-        Command::new(&self.path)
-    }
-
-    fn description(&self) -> String {
-        self.name.to_string()
-    }
-}
-
-pub trait Executable: Debug {
-    fn new_cmd(&self) -> Command;
-    fn description(&self) -> String;
 }
