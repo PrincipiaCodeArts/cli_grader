@@ -1,23 +1,24 @@
+use crate::grader::assessment_modalities::unit_test::assertion::Assertion;
 use crate::grader::score::{GradingMode, Score};
-use crate::grader::{
-    assessment_modalities::unit_test::assertion::Assertion, os_interface::TargetProgram,
-};
 
 pub mod assertion;
 
+use crate::grader::executable::ExecutableArtifact;
 use assertion::AssertionResult;
 use std::{fs, io, process};
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ProgramUnitAssertions {
     name: String, // Default: `Unit testing <TargetProgram>`
-    program: TargetProgram,
+    executable: ExecutableArtifact,
     assertions: Vec<Assertion>,
 }
+
 impl ProgramUnitAssertions {
-    pub fn new(name: String, program: TargetProgram) -> Self {
+    pub fn new(name: String, executable: ExecutableArtifact) -> Self {
         Self {
             name,
-            program,
+            executable,
             assertions: vec![],
         }
     }
@@ -30,6 +31,7 @@ impl ProgramUnitAssertions {
         self.assertions.push(assertion);
     }
 
+    // TODO (optimize): pass the arguments by reference
     fn run_assertions(
         &self,
         envs: Vec<(String, String)>,
@@ -39,8 +41,11 @@ impl ProgramUnitAssertions {
         teardown: Vec<(String, Vec<String>)>,
         grading_mode: GradingMode,
     ) -> io::Result<ProgramUnitAssertionResults> {
-        let mut result =
-            ProgramUnitAssertionResults::new(self.name.clone(), self.program.clone(), grading_mode);
+        let mut result = ProgramUnitAssertionResults::new(
+            self.name.clone(),
+            self.executable.name(),
+            grading_mode,
+        );
         for assertion in self.assertions.iter() {
             let tmp_dir = match tempfile::tempdir() {
                 Ok(dir) => dir,
@@ -78,7 +83,7 @@ impl ProgramUnitAssertions {
             }
 
             // setup cmd
-            let mut cmd = process::Command::new(self.program.get_path());
+            let mut cmd = self.executable.new_cmd();
             if !inherited_parent_envs {
                 cmd.env_clear();
             }
@@ -109,16 +114,16 @@ impl ProgramUnitAssertions {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ProgramUnitAssertionResults {
     name: String,
-    program: TargetProgram,
+    executable_name: String,
     score: Score,
     assertion_results: Vec<AssertionResult>,
 }
 
 impl ProgramUnitAssertionResults {
-    pub fn new(name: String, program: TargetProgram, grading_mode: GradingMode) -> Self {
+    pub fn new(name: String, executable_name: String, grading_mode: GradingMode) -> Self {
         Self {
             name,
-            program,
+            executable_name,
             score: Score::default(grading_mode),
             assertion_results: vec![],
         }
@@ -143,23 +148,17 @@ impl ProgramUnitAssertionResults {
     }
 }
 
-// TODO (transform to struct): instead of enum, use a trait to define the interface
-// necessary to implement a Tests.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Tests {
-    UnitTest {
-        envs: Vec<(String, String)>,
-        inherited_parent_envs: bool,
-        files: Vec<(String, String)>,
-        setup: Vec<(String, Vec<String>)>,
-        teardown: Vec<(String, Vec<String>)>,
-        assertions_per_program: Vec<ProgramUnitAssertions>,
-    },
-    // integration tests
-    // performance tests
+pub struct UnitTest {
+    envs: Vec<(String, String)>,
+    inherited_parent_envs: bool,
+    files: Vec<(String, String)>,
+    setup: Vec<(String, Vec<String>)>,
+    teardown: Vec<(String, Vec<String>)>,
+    assertions_per_program: Vec<ProgramUnitAssertions>,
 }
-impl Tests {
-    pub fn new_unit_test(
+impl UnitTest {
+    pub fn new(
         envs: Vec<(String, String)>,
         inherited_parent_envs: bool,
         files: Vec<(String, String)>,
@@ -167,7 +166,7 @@ impl Tests {
         teardown: Vec<(String, Vec<String>)>,
         assertions_per_program: Vec<ProgramUnitAssertions>,
     ) -> Self {
-        Self::UnitTest {
+        Self {
             envs,
             inherited_parent_envs,
             files,
@@ -176,59 +175,61 @@ impl Tests {
             assertions_per_program,
         }
     }
-    pub fn run_tests(&self, grading_mode: GradingMode) -> TestResults {
-        let mut score;
-        match self {
-            Tests::UnitTest {
-                envs,
-                files,
-                inherited_parent_envs,
-                setup,
-                teardown,
-                assertions_per_program,
-            } => {
-                score = Score::default(grading_mode);
-                let mut test_results = vec![];
-                for program_unit_assertion in assertions_per_program {
-                    let res = program_unit_assertion
-                        .run_assertions(
-                            envs.clone(),
-                            *inherited_parent_envs,
-                            files.to_vec(),
-                            setup.clone(),
-                            teardown.clone(),
-                            grading_mode,
-                        )
-                        // TODO (handle error): instead of panicking, it should incorporate
-                        // the error into the result, making it clear why did it fail.
-                        // Maybe, it would be better to incorporate the error to a more fine
-                        // grained level of assertion.
-                        .expect("error during assertion");
-                    score += res.score;
-                    test_results.push(res);
-                }
-                return TestResults::UnitTestResults {
-                    score,
-                    assertion_per_program_results: test_results,
-                };
-            }
+
+    pub fn run_tests(&self, grading_mode: GradingMode) -> UnitTestResult {
+        let mut result = UnitTestResult::new(grading_mode);
+        for program_unit_assertion in self.assertions_per_program.iter() {
+            let res = program_unit_assertion
+                .run_assertions(
+                    self.envs.clone(),
+                    self.inherited_parent_envs,
+                    self.files.to_vec(),
+                    self.setup.clone(),
+                    self.teardown.clone(),
+                    grading_mode,
+                )
+                // TODO (handle error): instead of panicking, it should incorporate
+                // the error into the result, making it clear why did it fail.
+                // Maybe, it would be better to incorporate the error to a more fine
+                // grained level of assertion.
+                .expect("error during assertion");
+            result.add_result(res);
         }
+        result
     }
 }
 
-// TODO maybe create a results module for its traits
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum TestResults {
-    UnitTestResults {
-        score: Score,
-        assertion_per_program_results: Vec<ProgramUnitAssertionResults>,
-    },
+pub struct UnitTestResult {
+    score: Score,
+    assertions_per_program_results: Vec<ProgramUnitAssertionResults>,
 }
 
-impl TestResults {
-    pub fn score(&self) -> Score {
-        match self {
-            TestResults::UnitTestResults { score, .. } => *score,
+impl UnitTestResult {
+    fn new(grading_mode: GradingMode) -> Self {
+        Self {
+            score: Score::default(grading_mode),
+            assertions_per_program_results: vec![],
         }
+    }
+
+    #[cfg(test)]
+    pub fn new_with(
+        score: Score,
+        assertions_per_program_results: Vec<ProgramUnitAssertionResults>,
+    ) -> Self {
+        Self {
+            score,
+            assertions_per_program_results,
+        }
+    }
+
+    fn add_result(&mut self, result: ProgramUnitAssertionResults) {
+        self.score += result.score;
+        self.assertions_per_program_results.push(result);
+    }
+
+    pub fn score(&self) -> Score {
+        self.score
     }
 }
