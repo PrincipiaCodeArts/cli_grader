@@ -60,7 +60,7 @@ impl AssertionsPerExecutable {
                 log::debug!("Creating file: {}", name);
                 file_path = tmp_dir.path().join(name);
                 if let Err(err) = fs::write(&file_path, content) {
-                    log::error!("error while creating the file: {}", name);
+                    log::error!("error while creating the file: {name}");
                     log::debug!("error: {err:?}");
                     return Err(err);
                 }

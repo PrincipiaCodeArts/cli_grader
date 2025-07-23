@@ -201,7 +201,7 @@ impl Assertion {
                 String::from_utf8_lossy(&output.stdout).replace('\n', "\\n")
             );
         }
-        debug!("Output details: {:?}", output);
+        debug!("Output details: {output:?}");
 
         let mut passed = true;
         if output.status.success() {
