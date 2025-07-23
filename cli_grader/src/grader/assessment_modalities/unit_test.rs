@@ -57,7 +57,7 @@ impl AssertionsPerExecutable {
             // create files
             let mut file_path;
             for (name, content) in files {
-                log::debug!("Creating file: {}", name);
+                log::debug!("Creating file: {name}");
                 file_path = tmp_dir.path().join(name);
                 if let Err(err) = fs::write(&file_path, content) {
                     log::error!("error while creating the file: {name}");
