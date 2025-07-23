@@ -67,7 +67,7 @@ impl AssertionResult {
         0
     }
     pub fn max_score(&self) -> u32 {
-        return self.weight;
+        self.weight
     }
 
     fn set_passed(&mut self, v: bool) {

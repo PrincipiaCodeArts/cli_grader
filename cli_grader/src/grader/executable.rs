@@ -12,10 +12,10 @@ use std::{fmt::Debug, path::PathBuf, process::Command};
 ///
 /// # Caveats
 /// - It is important not to confuse `ExecutableArtifact` with an executable in the
-/// traditional meaning (i.e. binary executable). A binary executable may be an
-/// `ExecutableArtifact`, but not necessarily the latter will be the former. An
-/// `ExecutableArtifact` may also appear in other formats, like Python source code or any
-/// other programming languages' source code.
+///   traditional meaning (i.e. binary executable). A binary executable may be an
+///   `ExecutableArtifact`, but not necessarily the latter will be the former. An
+///   `ExecutableArtifact` may also appear in other formats, like Python source code or any
+///   other programming languages' source code.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ExecutableArtifact {
     CompiledProgram { name: String, path: PathBuf },

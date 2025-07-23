@@ -156,7 +156,7 @@ impl AssertionsPerExecutableResult {
 ///
 /// # Fields
 /// - `inherited_parent_envs`: whether it will inherith the environment variables from
-/// parent process.
+///   parent process.
 /// - files: List of `(<filename>, <file_content>)`.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UnitTest {

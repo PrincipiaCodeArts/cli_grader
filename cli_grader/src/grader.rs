@@ -1,6 +1,6 @@
 mod assessment_modalities;
 mod executable;
-mod score;
+pub mod score;
 
 use crate::grader::assessment_modalities::Assessment;
 use crate::grader::score::Mode;
@@ -58,7 +58,7 @@ impl GradingSectionResult {
 /// This document has all the configuration for a complete assessment of one or more
 /// executable artifacts.
 #[derive(Debug, PartialEq, Eq, Clone)]
-struct GradingConfig {
+pub struct GradingConfig {
     name: String,
     author: String,
     grading_mode: Mode,
@@ -66,7 +66,7 @@ struct GradingConfig {
 }
 
 impl GradingConfig {
-    fn new(name: String, author: String, grading_mode: Mode) -> Self {
+    pub fn new(name: String, author: String, grading_mode: Mode) -> Self {
         Self {
             name,
             author,
@@ -91,7 +91,7 @@ impl GradingConfig {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-struct GradingResult {
+pub struct GradingResult {
     name: String,
     author: String,
     score: Score,
@@ -115,7 +115,7 @@ impl GradingResult {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-struct Grader<'a> {
+pub struct Grader<'a> {
     config: &'a GradingConfig,
 }
 
@@ -123,7 +123,7 @@ impl<'a> Grader<'a> {
     pub fn new(config: &'a GradingConfig) -> Self {
         Self { config }
     }
-    pub fn run_assessment(&self) -> GradingResult {
+    pub fn run(&self) -> GradingResult {
         self.config.run()
     }
 }
@@ -136,7 +136,7 @@ mod tests {
         use super::*;
         use crate::grader::{
             assessment_modalities::unit_test::{
-                assertion::Assertion, AssertionsPerExecutable, UnitTest,
+                AssertionsPerExecutable, UnitTest, assertion::Assertion,
             },
             executable::ExecutableArtifact,
         };
@@ -247,8 +247,8 @@ mod tests {
         use super::*;
         use crate::grader::{
             assessment_modalities::unit_test::{
-                assertion::Assertion, AssertionsPerExecutable, AssertionsPerExecutableResult,
-                UnitTest, UnitTestResult,
+                AssertionsPerExecutable, AssertionsPerExecutableResult, UnitTest, UnitTestResult,
+                assertion::Assertion,
             },
             executable::ExecutableArtifact,
         };
@@ -304,12 +304,14 @@ mod tests {
                 ],
                 vec![],
                 vec![],
-                vec![AssertionsPerExecutable::new(
-                    program_unit_assertions_name.clone(),
-                    target_program.clone(),
-                )
-                .with_assertion(assertion1)
-                .with_assertion(assertion2)],
+                vec![
+                    AssertionsPerExecutable::new(
+                        program_unit_assertions_name.clone(),
+                        target_program.clone(),
+                    )
+                    .with_assertion(assertion1)
+                    .with_assertion(assertion2),
+                ],
             ));
             let section1 = GradingSection::new("section 1".to_string(), 1, section1_tests);
 
@@ -337,13 +339,15 @@ mod tests {
                                 current: 14,
                                 max: 14
                             },
-                            vec![AssertionsPerExecutableResult::new(
-                                program_unit_assertions_name,
-                                target_program.name(),
-                                Mode::Weighted
-                            )
-                            .with_assertion_result(expected_assertion1)
-                            .with_assertion_result(expected_assertion2)]
+                            vec![
+                                AssertionsPerExecutableResult::new(
+                                    program_unit_assertions_name,
+                                    target_program.name(),
+                                    Mode::Weighted
+                                )
+                                .with_assertion_result(expected_assertion1)
+                                .with_assertion_result(expected_assertion2)
+                            ]
                         ))),
                     }]
                 }
