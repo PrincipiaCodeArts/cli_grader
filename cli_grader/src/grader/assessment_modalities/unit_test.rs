@@ -157,7 +157,9 @@ impl AssertionsPerExecutableResult {
 /// # Fields
 /// - `inherited_parent_envs`: whether it will inherith the environment variables from
 ///   parent process.
-/// - files: List of `(<filename>, <file_content>)`.
+/// - files: Vec of `(<filename>, <file_content>)`.
+/// - setup: Vec of (<command, Vec of args)
+/// - teardown: Vec of (<command, Vec of args)
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UnitTest {
     envs: Vec<(String, String)>,

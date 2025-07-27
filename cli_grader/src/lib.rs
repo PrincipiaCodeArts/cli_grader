@@ -7,11 +7,12 @@ mod report;
 #[allow(dead_code)]
 mod grader;
 
+pub use grader::score::Mode;
 pub use grader::Grader;
 pub use grader::GradingConfig;
 pub use grader::GradingResult;
-pub use grader::score::Mode;
 
+// ignore below
 pub fn add(left: u64, right: u64) -> u64 {
     // use grader
     let conf = GradingConfig::new(
