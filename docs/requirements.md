@@ -416,10 +416,10 @@ Below, we have a table with all the
 
 4. **grading**: Only the unit testing functionality will be implemented
    at this stage.
-    - [ ] Implement the functionality for grading the user program given
+    - [X] Implement the functionality for grading the user program given
       a configuration file described in `Part1.2`. In this step, the
       `assert_cmd` crate may be very helpful.
-    - [ ] Implement both **absolute** and **weighted** mode for grading. 
+    - [X] Implement both **absolute** and **weighted** mode for grading. 
         - **absolute**: the user will get 100% of the score only if
           **all tests are passed**.
         - **weighted**: each test will have a weight (defaults to 1, if
