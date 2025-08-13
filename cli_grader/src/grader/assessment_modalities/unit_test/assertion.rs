@@ -205,28 +205,28 @@ impl Assertion {
 
         let mut passed = true;
         if output.status.success() {
-            if let Some(expected_status) = self.status {
-                if expected_status != 0 {
-                    debug!("  ❌ Failed status assertion.");
-                    debug!("   -📋 Expected: {expected_status}");
-                    debug!("   -📊 Obtained: 0 (success)");
-                    passed = false;
-                    assertion_result.set_status_diagnostics(expected_status, Some(0));
-                }
+            if let Some(expected_status) = self.status
+                && expected_status != 0
+            {
+                debug!("  ❌ Failed status assertion.");
+                debug!("   -📋 Expected: {expected_status}");
+                debug!("   -📊 Obtained: 0 (success)");
+                passed = false;
+                assertion_result.set_status_diagnostics(expected_status, Some(0));
             }
             assertion_result.set_execution_status(ExecutionStatus::Success);
         } else {
             match output.status.code() {
                 Some(obtained_status) => {
-                    if let Some(expected_status) = self.status {
-                        if expected_status != obtained_status {
-                            debug!("  ❌ Failed status assertion.");
-                            debug!("   -📋 Expected: {expected_status}");
-                            debug!("   -📊 Obtained: {obtained_status}");
-                            passed = false;
-                            assertion_result
-                                .set_status_diagnostics(expected_status, Some(obtained_status));
-                        }
+                    if let Some(expected_status) = self.status
+                        && expected_status != obtained_status
+                    {
+                        debug!("  ❌ Failed status assertion.");
+                        debug!("   -📋 Expected: {expected_status}");
+                        debug!("   -📊 Obtained: {obtained_status}");
+                        passed = false;
+                        assertion_result
+                            .set_status_diagnostics(expected_status, Some(obtained_status));
                     }
                     assertion_result
                         .set_execution_status(ExecutionStatus::FailureWithStatus(obtained_status))
@@ -245,41 +245,41 @@ impl Assertion {
             }
         }
 
-        if let Some(ref expected_stdout) = self.stdout {
-            if output.stdout != expected_stdout.as_bytes() {
-                debug!("  ❌ Failed stdout assertion.");
-                debug!(
-                    "   -📋 Expected: '{}'",
-                    expected_stdout.replace('\n', "\\n")
-                );
-                debug!(
-                    "   -📊 Obtained: '{}'",
-                    String::from_utf8_lossy(&output.stdout).replace('\n', "\\n")
-                );
-                passed = false;
-                assertion_result.set_stdout_diagnostics(
-                    expected_stdout.clone(),
-                    Some(String::from_utf8_lossy(&output.stdout).into_owned()),
-                );
-            }
+        if let Some(ref expected_stdout) = self.stdout
+            && output.stdout != expected_stdout.as_bytes()
+        {
+            debug!("  ❌ Failed stdout assertion.");
+            debug!(
+                "   -📋 Expected: '{}'",
+                expected_stdout.replace('\n', "\\n")
+            );
+            debug!(
+                "   -📊 Obtained: '{}'",
+                String::from_utf8_lossy(&output.stdout).replace('\n', "\\n")
+            );
+            passed = false;
+            assertion_result.set_stdout_diagnostics(
+                expected_stdout.clone(),
+                Some(String::from_utf8_lossy(&output.stdout).into_owned()),
+            );
         }
-        if let Some(ref expected_stderr) = self.stderr {
-            if output.stderr != expected_stderr.as_bytes() {
-                debug!("  ❌ Failed stderr assertion.");
-                debug!(
-                    "   -📋 Expected: '{}'",
-                    expected_stderr.replace('\n', "\\n")
-                );
-                debug!(
-                    "   -📊 Obtained: '{}'",
-                    String::from_utf8_lossy(&output.stderr).replace('\n', "\\n")
-                );
-                passed = false;
-                assertion_result.set_stderr_diagnostics(
-                    expected_stderr.clone(),
-                    Some(String::from_utf8_lossy(&output.stderr).into_owned()),
-                );
-            }
+        if let Some(ref expected_stderr) = self.stderr
+            && output.stderr != expected_stderr.as_bytes()
+        {
+            debug!("  ❌ Failed stderr assertion.");
+            debug!(
+                "   -📋 Expected: '{}'",
+                expected_stderr.replace('\n', "\\n")
+            );
+            debug!(
+                "   -📊 Obtained: '{}'",
+                String::from_utf8_lossy(&output.stderr).replace('\n', "\\n")
+            );
+            passed = false;
+            assertion_result.set_stderr_diagnostics(
+                expected_stderr.clone(),
+                Some(String::from_utf8_lossy(&output.stderr).into_owned()),
+            );
         }
 
         assertion_result.set_passed(passed);
