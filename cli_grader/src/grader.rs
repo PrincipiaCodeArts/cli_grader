@@ -136,7 +136,7 @@ mod tests {
         use super::*;
         use crate::grader::{
             assessment_modalities::unit_test::{
-                assertion::Assertion, AssertionsPerExecutable, UnitTest,
+                AssertionsPerExecutable, UnitTest, assertion::Assertion,
             },
             executable::ExecutableArtifact,
         };
@@ -247,8 +247,8 @@ mod tests {
         use super::*;
         use crate::grader::{
             assessment_modalities::unit_test::{
-                assertion::Assertion, AssertionsPerExecutable, AssertionsPerExecutableResult,
-                UnitTest, UnitTestResult,
+                AssertionsPerExecutable, AssertionsPerExecutableResult, UnitTest, UnitTestResult,
+                assertion::Assertion,
             },
             executable::ExecutableArtifact,
         };
@@ -304,12 +304,14 @@ mod tests {
                 ],
                 vec![],
                 vec![],
-                vec![AssertionsPerExecutable::new(
-                    program_unit_assertions_name.clone(),
-                    target_program.clone(),
-                )
-                .with_assertion(assertion1)
-                .with_assertion(assertion2)],
+                vec![
+                    AssertionsPerExecutable::new(
+                        program_unit_assertions_name.clone(),
+                        target_program.clone(),
+                    )
+                    .with_assertion(assertion1)
+                    .with_assertion(assertion2),
+                ],
             ));
             let section1 = GradingSection::new("section 1".to_string(), 1, section1_tests);
 
@@ -337,13 +339,15 @@ mod tests {
                                 current: 14,
                                 max: 14
                             },
-                            vec![AssertionsPerExecutableResult::new(
-                                program_unit_assertions_name,
-                                target_program.name(),
-                                Mode::Weighted
-                            )
-                            .with_assertion_result(expected_assertion1)
-                            .with_assertion_result(expected_assertion2)]
+                            vec![
+                                AssertionsPerExecutableResult::new(
+                                    program_unit_assertions_name,
+                                    target_program.name(),
+                                    Mode::Weighted
+                                )
+                                .with_assertion_result(expected_assertion1)
+                                .with_assertion_result(expected_assertion2)
+                            ]
                         ))),
                     }]
                 }

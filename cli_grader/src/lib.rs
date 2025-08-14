@@ -8,10 +8,10 @@ mod grader;
 
 mod configuration;
 
-pub use grader::score::Mode;
 pub use grader::Grader;
 pub use grader::GradingConfig;
 pub use grader::GradingResult;
+pub use grader::score::Mode;
 use serde::Deserialize;
 use serde::Serialize;
 
