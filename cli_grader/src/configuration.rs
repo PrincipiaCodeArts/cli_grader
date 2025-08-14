@@ -1,5 +1,9 @@
-use crate::{LoggingMode, grader::score::Mode as GradingMode};
-use serde::{Deserialize, Serialize};
+use crate::{grader::score::Mode as GradingMode, LoggingMode};
+use serde::{
+    de::{self, Visitor},
+    ser::SerializeSeq,
+    Deserialize, Serialize,
+};
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 struct GradingSection {
@@ -26,10 +30,12 @@ struct ReportSection {
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 enum InputType {
     #[default]
+    #[serde(rename = "exe")]
     CompiledProgram,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(untagged)]
 enum ProgramSpecification {
     OnlyType(InputType),
     Complete {
@@ -51,8 +57,8 @@ enum ProgramSpecification {
         ///   Without alias, we could have two versions, one being wrong:
         ///   `cligrader configuration.json p1.java p2.python`
         ///   `cligrader configuration.json p2.python p1.java`
-        alias: String,
-        input_type: InputType,
+        alias: Option<String>,
+        program_type: InputType,
     },
 }
 
@@ -91,19 +97,101 @@ enum TableHeaderType {
     Name,
 }
 
-// TODO (checkpoint): fix the serialized version of this enum.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(untagged)]
 enum TableCellContent {
+    Int(i64),
     String(String),
-    I32(i32),
-    U32(i32),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 struct Table {
     row_size: usize,
     header: Vec<TableHeaderType>,
     tests: Vec<Vec<TableCellContent>>,
+}
+
+impl Table {
+    fn build(
+        header: Vec<TableHeaderType>,
+        tests: Vec<Vec<TableCellContent>>,
+    ) -> Result<Self, &'static str> {
+        if header.is_empty() {
+            return Err("header must not be empty");
+        }
+        let row_size = header.len();
+        for t in &tests {
+            if t.len() != row_size {
+                return Err("inconsistent test case size");
+            }
+        }
+        // TODO check the type for each test case
+        Ok(Self {
+            row_size,
+            header,
+            tests,
+        })
+    }
+}
+
+impl Serialize for Table {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(1 + self.tests.len()))?;
+
+        // serialize header
+        seq.serialize_element(&self.header)?;
+
+        for e in &self.tests {
+            seq.serialize_element(e)?;
+        }
+        seq.end()
+    }
+}
+
+struct TableVisitor;
+
+impl<'de> Visitor<'de> for TableVisitor {
+    type Value = Table;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a table with a header followed by the tests")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let header: Vec<TableHeaderType> = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+        let mut tests: Vec<Vec<TableCellContent>> =
+            Vec::with_capacity(seq.size_hint().unwrap_or(1));
+        let first_test: Vec<TableCellContent> = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+        tests.push(first_test);
+
+        while let Some(t) = seq.next_element()? {
+            tests.push(t);
+        }
+
+        match Table::build(header, tests) {
+            Ok(v) => Ok(v),
+            Err(msg) => Err(de::Error::custom(msg)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Table {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(TableVisitor)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -133,20 +221,24 @@ type Value = String;
 type Command = String;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-enum TestContent {
-    UnitTest {
-        env: Vec<(Key, Value)>,
-        setup: Vec<Command>,
-        teardown: Vec<Command>,
-        tests: Vec<UnitTest>,
-    },
+struct UnitTests {
+    env: Vec<(Key, Value)>,
+    setup: Vec<Command>,
+    teardown: Vec<Command>,
+    tests: Vec<UnitTest>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct TestSection {
     title: Option<String>,
     weight: Option<u32>,
-    content: TestContent,
+    /// # Caveats
+    /// This field is optional for future purposes. In the future, it will be demanded that
+    /// exactly one of `unit_tests`, `integration_tests`, or `performance_tests` is
+    /// present.
+    unit_tests: Option<UnitTests>,
+    // integration_tests: IntegrationTests,
+    // performance_tests: PerformanceTests,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -167,7 +259,6 @@ struct Configuration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use log::info;
 
     mod test_configuration {
         use super::*;
@@ -175,10 +266,10 @@ mod tests {
         /// comparing it with the original `conf`.
         macro_rules! check_json_serialization_deserialization {
             ($conf:ident) => {{
-                let json = serde_json::to_string_pretty(&$conf).unwrap();
-                info!("\n{json}");
+                let json = ::serde_json::to_string_pretty(&$conf).unwrap();
+                ::log::info!("\n{json}");
 
-                let from_json: Configuration = serde_json::from_str(json.as_str()).unwrap();
+                let from_json: Configuration = ::serde_json::from_str(json.as_str()).unwrap();
 
                 assert!(
                     from_json == $conf,
@@ -203,7 +294,7 @@ mod tests {
                 sections: vec![TestSection {
                     title: Some("Section 1".to_string()),
                     weight: Some(12),
-                    content: TestContent::UnitTest {
+                    unit_tests: Some(UnitTests {
                         env: vec![],
                         setup: vec![],
                         teardown: vec![],
@@ -232,12 +323,244 @@ mod tests {
                                 weight: Some(2),
                             }],
                         }],
-                    },
+                    }),
                 }],
             };
             check_json_serialization_deserialization!(c);
-            // TODO uncomment this to see the logging from this test.
-            //assert!(1 == 2);
         }
+
+        macro_rules! check_invalid_configuration {
+            ($name:ident, $conf:expr) => {
+                #[test_log::test]
+                #[should_panic]
+                fn $name() {
+                    let from_json: Configuration = ::serde_json::from_str($conf).unwrap();
+                    ::log::error!("serialized:\n{}", $conf);
+                    ::log::error!("deserialized:\n{from_json:#?}");
+                }
+            };
+        }
+
+        // TODO (checkpoint): add more tests (testing serde using unit serde_test) and check
+        // each odd serde_json serialization/deserialization in isolated unit tests.
+        // Also, fix any inconsistency in the invalid configuration tests, adding new ones
+        // if necessary.
+        check_invalid_configuration!(should_panic_with_empty_json, r#"{}"#);
+        check_invalid_configuration!(
+            should_panic_with_strange_data,
+            r#"
+        {
+            "name": "John Doe",
+            "age": 43,
+            "phones": [
+                "+44 1234567",
+                "+44 2345678"
+            ]
+        }"#
+        );
+        check_invalid_configuration!(
+            should_panic_with_invalid_grading_mode,
+            r#"
+        {
+          "title": "configuration 1",
+          "author": null,
+          "logging_mode": "silent",
+          "grading": {
+            "mode": "invalid_mode"
+          },
+          "report": {
+            "is_verbose": false,
+            "output": "txt"
+          },
+          "input": {
+            "input_programs": ["exe"]
+          },
+          "sections": [
+            {
+              "title": "Section 1",
+              "weight": 12,
+              "unit_tests": {
+                "env": [],
+                "setup": [],
+                "teardown": [],
+                "tests": [
+                  {
+                    "title": null,
+                    "program_name": "p1",
+                    "table": {
+                      "row_size": 3,
+                      "header": [
+                        "args",
+                        "name",
+                        "stdout"
+                      ],
+                      "tests": [
+                        [
+                          "arg1 arg2 arg3",
+                          "test1",
+                          "expected"
+                        ]
+                      ]
+                    },
+                    "detailed_tests": [
+                      {
+                        "name": "test2",
+                        "args": "a1 a2 a3 a4",
+                        "stdout": null,
+                        "stderr": null,
+                        "status": 23,
+                        "weight": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }"#
+        );
+        check_invalid_configuration!(
+            should_panic_with_invalid_report_output_mode,
+            r#"
+        {
+          "title": "configuration 1",
+          "author": null,
+          "logging_mode": "silent",
+          "grading": {
+            "mode": "absolute"
+          },
+          "report": {
+            "is_verbose": false,
+            "output": "not_valid"
+          },
+          "input": {
+            "input_programs": ["exe"]
+          },
+          "sections": [
+            {
+              "title": "Section 1",
+              "weight": 12,
+              "unit_tests": {
+                "env": [],
+                "setup": [],
+                "teardown": [],
+                "tests": [
+                  {
+                    "title": null,
+                    "program_name": "p1",
+                    "table": {
+                      "row_size": 3,
+                      "header": [
+                        "args",
+                        "name",
+                        "stdout"
+                      ],
+                      "tests": [
+                        [
+                          "arg1 arg2 arg3",
+                          "test1",
+                          "expected"
+                        ]
+                      ]
+                    },
+                    "detailed_tests": [
+                      {
+                        "name": "test2",
+                        "args": "a1 a2 a3 a4",
+                        "stdout": null,
+                        "stderr": null,
+                        "status": 23,
+                        "weight": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+              
+            }
+          ]
+        }"#
+        );
+
+        macro_rules! check_valid_configuration {
+            ($name:ident, $conf:expr) => {
+                #[test_log::test]
+                fn $name() {
+                    let _t: Configuration = ::serde_json::from_str($conf).unwrap();
+                    //::log::info!("{_t:#?}");
+                    //assert!(1 == 2);
+                }
+            };
+        }
+
+        // TODO use this to adjust the acceptable versions.
+        check_valid_configuration!(
+            should_accept_basic,
+            r#"
+        {
+          "title": "Configuration ABC",
+          "author": "Author ABC",
+          "logging_mode": "silent",
+          "grading": {
+            "mode": "weighted"
+          },
+          "report": {
+            "is_verbose": true,
+            "output": "txt"
+          },
+          "input": {
+            "input_programs": [
+              "exe",
+              {
+                "alias": "programY",
+                "program_type":"exe"
+              },
+              {
+                "program_type":"exe"
+              }
+            ]
+          },
+          "sections": [
+            {
+              "title": "Section 1",
+              "weight": 12,
+              "unit_tests": {
+                "env": [],
+                "setup": [],
+                "teardown": [],
+                "tests": [
+                  {
+                    "title": null,
+                    "program_name": "p1",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ],
+                    "detailed_tests": [
+                      {
+                        "name": "test2",
+                        "args": "a1 a2 a3 a4",
+                        "stdout": null,
+                        "stderr": null,
+                        "status": 23,
+                        "weight": 2
+                      },
+                      {
+                        "name": "testABC",
+                        "args": "a1",
+                        "status": -1,
+                        "weight": 3
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }"#
+        );
     }
 }
