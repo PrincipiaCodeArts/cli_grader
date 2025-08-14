@@ -236,7 +236,8 @@ mod tests {
                 }],
             };
             check_json_serialization_deserialization!(c);
-            assert!(1 == 2);
+            // TODO uncomment this to see the logging from this test.
+            //assert!(1 == 2);
         }
     }
 }
