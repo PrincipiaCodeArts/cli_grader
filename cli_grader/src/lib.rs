@@ -1,5 +1,4 @@
 /*
-mod configuration;
 mod input;
 mod report;
 */
@@ -7,10 +6,23 @@ mod report;
 #[allow(dead_code)]
 mod grader;
 
+mod configuration;
+
+pub use grader::score::Mode;
 pub use grader::Grader;
 pub use grader::GradingConfig;
 pub use grader::GradingResult;
-pub use grader::score::Mode;
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum LoggingMode {
+    Silent,
+    #[default]
+    Normal,
+    Verbose,
+}
 
 // ignore below
 pub fn add(left: u64, right: u64) -> u64 {
