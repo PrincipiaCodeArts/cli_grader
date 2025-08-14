@@ -1,8 +1,8 @@
-use crate::{grader::score::Mode as GradingMode, LoggingMode};
+use crate::{LoggingMode, grader::score::Mode as GradingMode};
 use serde::{
+    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
-    Deserialize, Serialize,
 };
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
