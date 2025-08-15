@@ -22,9 +22,9 @@ enum ReportOutput {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
+#[serde(deny_unknown_fields, default)]
 struct ReportSection {
     is_verbose: bool,
-    #[serde(default)]
     output: ReportOutput,
 }
 
@@ -36,7 +36,7 @@ enum InputType {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(untagged)]
+#[serde(untagged, deny_unknown_fields)]
 enum ProgramSpecification {
     OnlyType(InputType),
     Complete {
@@ -58,7 +58,8 @@ enum ProgramSpecification {
         ///   Without alias, we could have two versions, one being wrong:
         ///   `cligrader configuration.json p1.java p2.python`
         ///   `cligrader configuration.json p2.python p1.java`
-        alias: Option<String>,
+        alias: String,
+        #[serde(default)]
         program_type: InputType,
     },
 }
@@ -70,12 +71,14 @@ impl Default for ProgramSpecification {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 struct InputSection {
     /// This vector will define all the programs that will be available in the scope of the
     /// test.
     ///
     /// # Default
     /// Defaults to only one program with the standard name: "program1" and one additional  "p1"
+    #[serde(default)]
     input_programs: Vec<ProgramSpecification>,
 }
 
@@ -97,6 +100,8 @@ enum TableHeaderType {
     Weight,
     Name,
 }
+
+// TODO (checkpoint): test TableCellContent ser-de.
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
@@ -264,7 +269,10 @@ mod tests {
     /// From a deserialized item, test if it serializes correctly and then deserializes in
     /// sequence, maintaining the same information.
     macro_rules! test_serialize_and_deserialize {
-        ($name:ident, $deserialized:expr, $type:ident) => {
+        ($name:ident, $deserialized:expr, $type:ident, DEBUG) => {
+            test_serialize_and_deserialize!($name, $deserialized, $type, true);
+        };
+        ($name:ident, $deserialized:expr, $type:ident $(, $fails:expr)? ) => {
             #[::test_log::test]
             fn $name() {
                 let json = ::serde_json::to_string_pretty(&$deserialized).unwrap();
@@ -276,6 +284,11 @@ mod tests {
                     re_deserialized == $deserialized,
                     "the re-deserialized version is not equal to the original one"
                 );
+                $(
+                    if $fails {
+                        assert!(false, "failed for debugging reasons");
+                    }
+                )?
             }
         };
     }
@@ -324,7 +337,7 @@ mod tests {
         );
 
         // invalid deserialization
-        test_invalid_deserialization!(should_panic_with_empty, r#"{}"#, ReportSection);
+        test_invalid_deserialization!(should_panic_with_no_content_string, r#"\n"#, ReportSection);
         test_invalid_deserialization!(
             should_panic_with_wrong_is_verbose,
             r#"
@@ -352,8 +365,18 @@ mod tests {
         }"#,
             ReportSection
         );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_key,
+            r#"
+        {
+            "is_verbose": true,
+            "outputi": "txt"
+        }"#,
+            ReportSection
+        );
 
         // valid deserialization
+        test_valid_deserialization!(should_accept_empty_object, r#"{}"#, ReportSection);
         test_valid_deserialization!(
             should_accept_basic,
             r#"
@@ -370,6 +393,204 @@ mod tests {
             "is_verbose": true
         }"#,
             ReportSection
+        );
+    }
+
+    mod test_program_specification {
+        use crate::configuration::{InputType, ProgramSpecification};
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_with_only_type,
+            ProgramSpecification::OnlyType(InputType::CompiledProgram),
+            ProgramSpecification
+        );
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_with_complete_spec,
+            ProgramSpecification::Complete {
+                alias: "program ABC".to_string(),
+                program_type: InputType::CompiledProgram
+            },
+            ProgramSpecification
+        );
+
+        // invalid deserialization
+        test_invalid_deserialization!(
+            should_panic_with_empty_object,
+            r#"{}"#,
+            ProgramSpecification
+        );
+        test_invalid_deserialization!(should_panic_with_empty_string, r#""#, ProgramSpecification);
+        test_invalid_deserialization!(
+            should_panic_with_invalid_object,
+            r#"{"invalid data"}"#,
+            ProgramSpecification
+        );
+        test_invalid_deserialization!(
+            should_panic_with_string,
+            r#""invalid data""#,
+            ProgramSpecification
+        );
+        test_invalid_deserialization!(
+            should_panic_with_incorrect_complete_version,
+            r#"
+            {
+                "program_type":"exee",
+                "alias":null
+            }"#,
+            ProgramSpecification
+        );
+        test_invalid_deserialization!(
+            should_panic_without_program_type,
+            r#"
+            {
+                "alias":null
+            }"#,
+            ProgramSpecification
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_key_for_alias,
+            r#"
+            {
+                "alia":"hello",
+                "program_type":"exe"
+            }"#,
+            ProgramSpecification
+        );
+        test_invalid_deserialization!(
+            should_panic_with_extra_field,
+            r#"
+            {
+                "program_type":"exe",
+                "_extra_field":123,
+                "alias":"name1"
+            }"#,
+            ProgramSpecification
+        );
+
+        // valid deserialization
+        test_valid_deserialization!(
+            should_accept_basic_only_type,
+            r#""exe""#,
+            ProgramSpecification
+        );
+        test_valid_deserialization!(
+            should_accept_complete_type_with_alias,
+            r#"
+            {
+                "alias":"program ABC",
+                "program_type":"exe"
+            }"#,
+            ProgramSpecification
+        );
+        test_valid_deserialization!(
+            should_accept_complete_type_without_program_type,
+            r#"
+            {
+                "alias":"program ABC"
+            }"#,
+            ProgramSpecification
+        );
+    }
+
+    mod test_input_section {
+        use crate::configuration::{InputSection, InputType, ProgramSpecification};
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_with_empty_input_programs,
+            InputSection {
+                input_programs: vec![]
+            },
+            InputSection
+        );
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_with_input_programs,
+            InputSection {
+                input_programs: vec![
+                    ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                    ProgramSpecification::Complete {
+                        alias: "hello".to_string(),
+                        program_type: InputType::CompiledProgram
+                    },
+                    ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                ]
+            },
+            InputSection
+        );
+
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_empty_string, r#""#, InputSection);
+        test_invalid_deserialization!(
+            should_panic_with_wrong_input_programs_type,
+            r#"
+        {
+            "input_programs": "invalid type"
+        }"#,
+            InputSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_key,
+            r#"
+        {
+            "input_rograms": []
+        }"#,
+            InputSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_duplicated_items,
+            r#"
+        {
+            "input_programs": [],
+            "input_programs": ["exe"]
+        }"#,
+            InputSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_extra_item,
+            r#"
+        {
+            "_comment": "abc",
+            "input_programs": ["exe"]
+        }"#,
+            InputSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_input_program,
+            r#"
+        {
+            "input_programs": ["invalid input here"]
+        }"#,
+            InputSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_input_program_format,
+            r#"
+        {
+            "input_programs": ["exe", 123]
+        }"#,
+            InputSection
+        );
+
+        // valid
+        test_valid_deserialization!(should_accept_empty, r#"{}"#, InputSection);
+        // For serialization purpose, this case is acceptable, but for application logic, it
+        // may not be accepted.
+        test_valid_deserialization!(
+            should_accept_empty_input_programs,
+            r#"
+        {
+            "input_programs": []
+        }"#,
+            InputSection
+        );
+        test_valid_deserialization!(
+            should_accept_with_input_programs,
+            r#"
+        {
+            "input_programs": ["exe", {"program_type":"exe", "alias":"programB"}]
+        }"#,
+            InputSection
         );
     }
 
@@ -595,6 +816,7 @@ mod tests {
                 "program_type":"exe"
               },
               {
+                "alias": "programZ",
                 "program_type":"exe"
               }
             ]
