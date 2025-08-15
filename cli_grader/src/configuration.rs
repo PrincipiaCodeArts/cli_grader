@@ -24,6 +24,7 @@ enum ReportOutput {
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 struct ReportSection {
     is_verbose: bool,
+    #[serde(default)]
     output: ReportOutput,
 }
 
@@ -260,26 +261,124 @@ struct Configuration {
 mod tests {
     use super::*;
 
-    mod test_configuration {
-        use super::*;
-        /// Serialize the configuration `conf`, logging its result and then deserialize it,
-        /// comparing it with the original `conf`.
-        macro_rules! check_json_serialization_deserialization {
-            ($conf:ident) => {{
-                let json = ::serde_json::to_string_pretty(&$conf).unwrap();
-                ::log::info!("\n{json}");
+    /// From a deserialized item, test if it serializes correctly and then deserializes in
+    /// sequence, maintaining the same information.
+    macro_rules! test_serialize_and_deserialize {
+        ($name:ident, $deserialized:expr, $type:ident) => {
+            #[::test_log::test]
+            fn $name() {
+                let json = ::serde_json::to_string_pretty(&$deserialized).unwrap();
+                ::log::info!("Serialized version:\n{json}");
 
-                let from_json: Configuration = ::serde_json::from_str(json.as_str()).unwrap();
+                let re_deserialized: $type = ::serde_json::from_str(json.as_str()).unwrap();
 
                 assert!(
-                    from_json == $conf,
+                    re_deserialized == $deserialized,
                     "the re-deserialized version is not equal to the original one"
                 );
-            }};
-        }
-        #[test_log::test]
-        fn check_serializarion_deserialization_for_configuration() {
-            let c = Configuration {
+            }
+        };
+    }
+    macro_rules! test_invalid_deserialization {
+        ($name:ident, $serialized:expr, $type:ident) => {
+            #[test_log::test]
+            #[should_panic]
+            fn $name() {
+                let from_json: $type = ::serde_json::from_str($serialized).unwrap();
+                ::log::error!("serialized:\n{}", $serialized);
+                ::log::error!("deserialized:\n{from_json:#?}");
+            }
+        };
+    }
+
+    macro_rules! test_valid_deserialization {
+        ($name:ident, $serialized:expr, $type:ident) => {
+            #[test_log::test]
+            fn $name() {
+                let _t: $type = ::serde_json::from_str($serialized).unwrap();
+                //::log::info!("{_t:#?}");
+                //assert!(1 == 2);
+            }
+        };
+    }
+
+    mod test_report_section {
+        use crate::configuration::{ReportOutput, ReportSection};
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_with_txt,
+            ReportSection {
+                is_verbose: true,
+                output: ReportOutput::Txt
+            },
+            ReportSection
+        );
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_with_stdout,
+            ReportSection {
+                is_verbose: true,
+                output: ReportOutput::Stdout
+            },
+            ReportSection
+        );
+
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_empty, r#"{}"#, ReportSection);
+        test_invalid_deserialization!(
+            should_panic_with_wrong_is_verbose,
+            r#"
+        {
+            "is_verbose": 123,
+            "output": "txt"
+        }"#,
+            ReportSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_output,
+            r#"
+        {
+            "is_verbose": true,
+            "output": "txt_invalid"
+        }"#,
+            ReportSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_is_verbose_as_str,
+            r#"
+        {
+            "is_verbose": "true",
+            "output": "txt"
+        }"#,
+            ReportSection
+        );
+
+        // valid deserialization
+        test_valid_deserialization!(
+            should_accept_basic,
+            r#"
+        {
+            "is_verbose": true,
+            "output": "stdout"
+        }"#,
+            ReportSection
+        );
+        test_valid_deserialization!(
+            should_accept_with_default_output,
+            r#"
+        {
+            "is_verbose": true
+        }"#,
+            ReportSection
+        );
+    }
+
+    mod test_configuration {
+        use super::*;
+
+        test_serialize_and_deserialize!(
+            should_serialize_and_deserialize,
+            Configuration {
                 title: "configuration 1".to_string(),
                 author: None,
                 logging_mode: LoggingMode::Silent,
@@ -325,28 +424,16 @@ mod tests {
                         }],
                     }),
                 }],
-            };
-            check_json_serialization_deserialization!(c);
-        }
-
-        macro_rules! check_invalid_configuration {
-            ($name:ident, $conf:expr) => {
-                #[test_log::test]
-                #[should_panic]
-                fn $name() {
-                    let from_json: Configuration = ::serde_json::from_str($conf).unwrap();
-                    ::log::error!("serialized:\n{}", $conf);
-                    ::log::error!("deserialized:\n{from_json:#?}");
-                }
-            };
-        }
+            },
+            Configuration
+        );
 
         // TODO (checkpoint): add more tests (testing serde using unit serde_test) and check
         // each odd serde_json serialization/deserialization in isolated unit tests.
         // Also, fix any inconsistency in the invalid configuration tests, adding new ones
         // if necessary.
-        check_invalid_configuration!(should_panic_with_empty_json, r#"{}"#);
-        check_invalid_configuration!(
+        test_invalid_deserialization!(should_panic_with_empty_json, r#"{}"#, Configuration);
+        test_invalid_deserialization!(
             should_panic_with_strange_data,
             r#"
         {
@@ -356,9 +443,10 @@ mod tests {
                 "+44 1234567",
                 "+44 2345678"
             ]
-        }"#
+        }"#,
+            Configuration
         );
-        check_invalid_configuration!(
+        test_invalid_deserialization!(
             should_panic_with_invalid_grading_mode,
             r#"
         {
@@ -417,9 +505,10 @@ mod tests {
               }
             }
           ]
-        }"#
+        }"#,
+            Configuration
         );
-        check_invalid_configuration!(
+        test_invalid_deserialization!(
             should_panic_with_invalid_report_output_mode,
             r#"
         {
@@ -479,22 +568,12 @@ mod tests {
               
             }
           ]
-        }"#
+        }"#,
+            Configuration
         );
 
-        macro_rules! check_valid_configuration {
-            ($name:ident, $conf:expr) => {
-                #[test_log::test]
-                fn $name() {
-                    let _t: Configuration = ::serde_json::from_str($conf).unwrap();
-                    //::log::info!("{_t:#?}");
-                    //assert!(1 == 2);
-                }
-            };
-        }
-
         // TODO use this to adjust the acceptable versions.
-        check_valid_configuration!(
+        test_valid_deserialization!(
             should_accept_basic,
             r#"
         {
@@ -560,7 +639,8 @@ mod tests {
               }
             }
           ]
-        }"#
+        }"#,
+            Configuration
         );
     }
 }
