@@ -4,6 +4,7 @@ use serde::{
     de::{self, Visitor},
     ser::SerializeSeq,
 };
+use std::{collections::HashSet, iter::zip};
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 struct GradingSection {
@@ -90,18 +91,45 @@ impl Default for InputSection {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 enum TableHeaderType {
+    Name,
+    Weight,
+    // input
     Args,
+    Stdin,
+    // expect
     Stdout,
     Stderr,
     Status,
-    Weight,
-    Name,
 }
+impl TableHeaderType {
+    /// Whether the `content` is compatible with its current table column type.
+    ///
+    /// # Compatibility
+    /// - Args, Stdout, Stderr, Name: String
+    /// - Status, Weight: Int
+    fn is_compatible_with(&self, content: &TableCellContent) -> bool {
+        match self {
+            TableHeaderType::Args
+            | TableHeaderType::Stdin
+            | TableHeaderType::Stdout
+            | TableHeaderType::Stderr
+            | TableHeaderType::Name => matches!(content, TableCellContent::String(_)),
+            TableHeaderType::Status | TableHeaderType::Weight => {
+                matches!(content, TableCellContent::Int(_))
+            }
+        }
+    }
 
-// TODO (checkpoint): test TableCellContent ser-de.
+    fn is_expect_type(&self) -> bool {
+        matches!(
+            self,
+            TableHeaderType::Stdout | TableHeaderType::Stderr | TableHeaderType::Status
+        )
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged)]
@@ -126,12 +154,33 @@ impl Table {
             return Err("header must not be empty");
         }
         let row_size = header.len();
+        let mut has_expect_col_type = false;
+        for h in &header {
+            if h.is_expect_type() {
+                has_expect_col_type = true;
+                break;
+            }
+        }
+        if !has_expect_col_type {
+            return Err(
+                "header must have at least one expect column type (stderr, stdout, or status",
+            );
+        }
+        let header_set: HashSet<&TableHeaderType> = HashSet::from_iter(&header);
+        if header_set.len() != row_size {
+            return Err("header must not have duplicated elements");
+        }
         for t in &tests {
             if t.len() != row_size {
                 return Err("inconsistent test case size");
             }
+            for (expected_type, content) in zip(&header, t) {
+                if expected_type.is_compatible_with(content) {
+                    continue;
+                }
+                return Err("inconsistent type from table test content cell");
+            }
         }
-        // TODO check the type for each test case
         Ok(Self {
             row_size,
             header,
@@ -200,6 +249,9 @@ impl<'de> Deserialize<'de> for Table {
     }
 }
 
+// TODO (checkpoint) use tryFrom from an unchecked DetaileTest type and validate during that
+// process.
+// Reference: https://users.rust-lang.org/t/struct-members-validation-on-serde-json-deserialize/123201/16
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct DetailedTest {
     name: Option<String>,
@@ -591,6 +643,166 @@ mod tests {
             "input_programs": ["exe", {"program_type":"exe", "alias":"programB"}]
         }"#,
             InputSection
+        );
+    }
+
+    mod test_table_cell_content {
+        use crate::configuration::TableCellContent;
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_int,
+            TableCellContent::Int(12),
+            TableCellContent
+        );
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_string,
+            TableCellContent::String("hello".to_string()),
+            TableCellContent
+        );
+
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_empty_string, r#""#, TableCellContent);
+        test_invalid_deserialization!(
+            should_panic_with_wrong_input_programs_type,
+            r#"{}"#,
+            TableCellContent
+        );
+        test_invalid_deserialization!(should_panic_with_invalid_int, r#"12j"#, TableCellContent);
+        test_invalid_deserialization!(
+            should_panic_with_invalid_string,
+            r#""missing_quotes"#,
+            TableCellContent
+        );
+
+        // valid
+        test_valid_deserialization!(should_accept_int, r#"123"#, TableCellContent);
+        test_valid_deserialization!(should_accept_negative_int, r#"-123"#, TableCellContent);
+        test_valid_deserialization!(
+            should_accept_string,
+            r#""hey this is a string""#,
+            TableCellContent
+        );
+    }
+
+    mod test_table {
+        use crate::configuration::{Table, TableCellContent, TableHeaderType};
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_table,
+            Table {
+                row_size: 4,
+                header: vec![
+                    TableHeaderType::Name,
+                    TableHeaderType::Args,
+                    TableHeaderType::Stdout,
+                    TableHeaderType::Status
+                ],
+                tests: vec![
+                    vec![
+                        TableCellContent::String("Test 1".to_string()),
+                        TableCellContent::String("a1 a2 a3".to_string()),
+                        TableCellContent::String("expected 1".to_string()),
+                        TableCellContent::Int(0),
+                    ],
+                    vec![
+                        TableCellContent::String("Test 2".to_string()),
+                        TableCellContent::String("a1 a3".to_string()),
+                        TableCellContent::String("expected 2".to_string()),
+                        TableCellContent::Int(1),
+                    ],
+                    vec![
+                        TableCellContent::String("Test 3".to_string()),
+                        TableCellContent::String("a1 a3 a4".to_string()),
+                        TableCellContent::String("expected 3".to_string()),
+                        TableCellContent::Int(0),
+                    ]
+                ]
+            },
+            Table
+        );
+
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_empty_string, r#""#, Table);
+        test_invalid_deserialization!(should_panic_with_empty_map, r#"{}"#, Table);
+        test_invalid_deserialization!(should_panic_with_empty_seq, r#"[]"#, Table);
+        test_invalid_deserialization!(
+            should_panic_with_invalid_header,
+            r#"["invalid data"]"#,
+            Table
+        );
+        test_invalid_deserialization!(should_panic_with_empty_header, r#"[[]]"#, Table);
+        test_invalid_deserialization!(should_panic_with_empty_content, r#"[[], [], []]"#, Table);
+        test_invalid_deserialization!(
+            should_panic_with_only_header,
+            r#"[["args", "status"]]"#,
+            Table
+        );
+        test_invalid_deserialization!(
+            should_panic_with_incompatible_content_size,
+            r#"[["args", "status"], ["arg1 arg2", 12], ["arg2 arg1"]]"#,
+            Table
+        );
+
+        test_invalid_deserialization!(
+            should_panic_with_incompatible_content_type,
+            r#"[
+                ["args", "status"], 
+                ["arg1 arg2", 12], 
+                ["arg2 arg1", "12"]
+            ]"#,
+            Table
+        );
+        test_invalid_deserialization!(
+            should_panic_when_header_is_not_first,
+            r#"[
+                ["test1", "123", "321"],
+                ["test2", "1233", "3321"], 
+                ["name", "stdin", "stdout"], 
+                ["test3", "121", "121"] 
+            ]"#,
+            Table
+        );
+        test_invalid_deserialization!(
+            should_panic_when_there_is_no_colum_of_type_expect,
+            r#"[
+                ["name", "args"], 
+                ["test1", "arg1 arg2"],
+                ["test2", "arg1 arg3"] 
+            ]"#,
+            Table
+        );
+        test_invalid_deserialization!(
+            should_panic_with_duplicated_element_in_header,
+            r#"[
+                ["name", "stdout", "stdout"], 
+                ["test1", "123", "321"],
+                ["test2", "1233", "3321"],
+                ["test3", "121", "121"] 
+            ]"#,
+            Table
+        );
+
+        // valid
+
+        test_valid_deserialization!(
+            should_accept_table_with_one_test,
+            r#"[
+                ["args", "status", "name"], 
+                ["arg1 arg2", 12, "test1"] 
+            ]"#,
+            Table
+        );
+        test_valid_deserialization!(
+            should_accept_table_with_three_test,
+            r#"[
+                ["name", "stdin", "stdout"], 
+                ["test1", "123", "321"],
+                ["test2", "1233", "3321"],
+                ["test3", "121", "121"] 
+            ]"#,
+            Table
         );
     }
 
