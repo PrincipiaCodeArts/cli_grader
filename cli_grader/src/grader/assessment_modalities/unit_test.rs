@@ -10,6 +10,8 @@ use std::{fs, io, process};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AssertionsPerExecutable {
     name: String, // Default: `Unit testing <TargetProgram>`
+    // TODO does it make sense to allow multiple executables to be tested under the same set
+    // of assertions?
     executable: ExecutableArtifact,
     assertions: Vec<Assertion>,
 }
@@ -148,6 +150,8 @@ impl AssertionsPerExecutableResult {
     }
 }
 
+// TODO add type alias to improve the signature of `UnitTest`
+// type Command = String;
 /// Each unit test will be the execution of an executable artifact along with some
 /// assertions. It will generate a result with the details of the process.
 ///

@@ -1,11 +1,14 @@
+use serde::{Deserialize, Serialize};
 use std::ops::{AddAssign, Mul};
 
 /// The way that the score will be calculated.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, Default)]
+#[serde(rename_all = "lowercase")]
 pub enum Mode {
     /// Score will be binary (0 or 1, true or false).
     Absolute,
     /// Score will range from 0 to the total of weight.
+    #[default]
     Weighted,
 }
 
