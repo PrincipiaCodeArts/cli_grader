@@ -405,6 +405,16 @@ impl UnitTest {
             detailed_tests,
         })
     }
+
+    #[cfg(test)]
+    fn new_dummy(n: u32) -> Self {
+        Self {
+            title: Some(format!("test {n}")),
+            program_name: Some(format!("program {n}")),
+            table: Some(Table::new_dummy()),
+            detailed_tests: vec![],
+        }
+    }
 }
 
 impl TryFrom<UnitTestUnchecked> for UnitTest {
@@ -431,13 +441,61 @@ type Key = String;
 type Value = String;
 type Command = String;
 
-// TODO (checkpoint): validate if tests are not empty
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct UnitTestsUnchecked {
+    env: Option<Vec<(Key, Value)>>,
+    setup: Option<Vec<Command>>,
+    teardown: Option<Vec<Command>>,
+    tests: Vec<UnitTest>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "UnitTestsUnchecked")]
 struct UnitTests {
     env: Vec<(Key, Value)>,
     setup: Vec<Command>,
     teardown: Vec<Command>,
     tests: Vec<UnitTest>,
+}
+
+impl UnitTests {
+    fn build(
+        env: Vec<(Key, Value)>,
+        setup: Vec<Command>,
+        teardown: Vec<Command>,
+        tests: Vec<UnitTest>,
+    ) -> Result<Self, &'static str> {
+        if tests.is_empty() {
+            return Err("must contain at least one test");
+        }
+        Ok(Self {
+            env,
+            setup,
+            teardown,
+            tests,
+        })
+    }
+}
+
+impl TryFrom<UnitTestsUnchecked> for UnitTests {
+    type Error = &'static str;
+
+    fn try_from(value: UnitTestsUnchecked) -> Result<Self, Self::Error> {
+        let UnitTestsUnchecked {
+            env,
+            setup,
+            teardown,
+            tests,
+        } = value;
+
+        UnitTests::build(
+            env.unwrap_or_default(),
+            setup.unwrap_or_default(),
+            teardown.unwrap_or_default(),
+            tests,
+        )
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -1289,6 +1347,127 @@ mod tests {
             ]
         }"#,
             UnitTest
+        );
+    }
+
+    mod test_unit_tests {
+        use crate::configuration::{UnitTest, UnitTests};
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_full,
+            UnitTests {
+                env: vec![
+                    ("k1".to_string(), "v1".to_string()),
+                    ("k2".to_string(), "v2".to_string())
+                ],
+                setup: vec!["cmd1 abc".to_string(), "cmd2 abc".to_string()],
+                teardown: vec!["cmd1 abcd".to_string(), "cmd2 abcd".to_string()],
+                tests: vec![UnitTest::new_dummy(0), UnitTest::new_dummy(1)]
+            },
+            UnitTests
+        );
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_empty,
+            UnitTests {
+                env: vec![],
+                setup: vec![],
+                teardown: vec![],
+                tests: vec![UnitTest::new_dummy(0)]
+            },
+            UnitTests
+        );
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_no_content_string, r#"\n"#, UnitTests);
+        test_invalid_deserialization!(should_panic_with_empty_object, r#"{}"#, UnitTests);
+        test_invalid_deserialization!(
+            should_panic_with_wrong_field,
+            r#"
+        {
+            "wrong field":123
+        }"#,
+            UnitTests
+        );
+        test_invalid_deserialization!(
+            should_panic_without_tests,
+            r#"
+        {
+            "setup":["cmd1 abc"],
+            "tests": []
+        }"#,
+            UnitTests
+        );
+        test_invalid_deserialization!(
+            should_panic_with_extra_field,
+            r#"
+        {
+            "setup":["cmd1 abc"],
+            "tests": [
+                {
+                    "title":"name 1",
+                    "program_name":"main",
+                    "detailed_tests":[
+                        {
+                            "args":"a1 a2 a3",
+                            "name":"test 1",
+                            "status":0,
+                            "stdout":"hello world"
+                        }
+                    ]
+                }
+            ],
+            "extra":""
+        }"#,
+            UnitTests
+        );
+        test_invalid_deserialization!(
+            should_panic_with_duplicated_fields,
+            r#"
+        {
+            "setup":["cmd1 abc"],
+            "setup":23,
+            "tests": [
+                {
+                    "title":"name 1",
+                    "program_name":"main",
+                    "detailed_tests":[
+                        {
+                            "args":"a1 a2 a3",
+                            "name":"test 1",
+                            "status":0,
+                            "stdout":"hello world"
+                        }
+                    ]
+                }
+            ]
+        }"#,
+            UnitTests
+        );
+
+        // valid deserialization
+        test_valid_deserialization!(
+            should_accepct_full_test,
+            r#"
+        {
+            "env":[["k1","v1"], ["k2","v2"]],
+            "teardown":["cmd2 abc", "cmd3"],
+            "setup":["cmd1 abc"],
+            "tests": [
+                {
+                    "title":"name 1",
+                    "program_name":"main",
+                    "detailed_tests":[
+                        {
+                            "args":"a1 a2 a3",
+                            "name":"test 1",
+                            "status":0,
+                            "stdout":"hello world"
+                        }
+                    ]
+                }
+            ]
+        }"#,
+            UnitTests
         );
     }
 
