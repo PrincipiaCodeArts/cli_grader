@@ -1,8 +1,8 @@
-use crate::{LoggingMode, grader::score::Mode as GradingMode};
+use crate::{grader::score::Mode as GradingMode, LoggingMode};
 use serde::{
-    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
+    Deserialize, Serialize,
 };
 use std::{collections::HashSet, iter::zip};
 
@@ -187,6 +187,34 @@ impl Table {
             tests,
         })
     }
+    #[cfg(test)]
+    fn new_dummy() -> Self {
+        Self {
+            row_size: 3,
+            header: vec![
+                TableHeaderType::Name,
+                TableHeaderType::Args,
+                TableHeaderType::Stdout,
+            ],
+            tests: vec![
+                vec![
+                    TableCellContent::String("test 1".to_string()),
+                    TableCellContent::String("a1 a2 a3".to_string()),
+                    TableCellContent::String("stdout 1".to_string()),
+                ],
+                vec![
+                    TableCellContent::String("test 2".to_string()),
+                    TableCellContent::String("a1 a2".to_string()),
+                    TableCellContent::String("stdout 2".to_string()),
+                ],
+                vec![
+                    TableCellContent::String("test 3".to_string()),
+                    TableCellContent::String("a1 a2 a3".to_string()),
+                    TableCellContent::String("stdout 3".to_string()),
+                ],
+            ],
+        }
+    }
 }
 
 impl Serialize for Table {
@@ -301,10 +329,23 @@ impl DetailedTest {
             status,
         })
     }
+
+    #[cfg(test)]
+    fn new_dummy(n: u32) -> Self {
+        Self {
+            name: Some(format!("test {n}")),
+            weight: Some(n),
+            args: Some("arg1 arg2 arg3".to_string()),
+            stdin: Some(format!("in {n}")),
+            stdout: Some(format!("out {n}")),
+            stderr: Some(format!("err {n}")),
+            status: Some(0),
+        }
+    }
 }
 
 impl TryFrom<DetailedTestUnchecked> for DetailedTest {
-    type Error = String;
+    type Error = &'static str;
 
     fn try_from(value: DetailedTestUnchecked) -> Result<Self, Self::Error> {
         let DetailedTestUnchecked {
@@ -317,29 +358,80 @@ impl TryFrom<DetailedTestUnchecked> for DetailedTest {
             status,
         } = value;
 
-        DetailedTest::build(name, weight, args, stdin, stdout, stderr, status).map_err(String::from)
+        DetailedTest::build(name, weight, args, stdin, stdout, stderr, status)
     }
 }
 
-// TODO (checkpoint): this element will validated to check if at least it has one table or one
-// detailed test. The validation for the program_name to check if it is in the scope will be
-// done only after configuration is parsed. It will call a function to validate it.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct UnitTestUnchecked {
+    title: Option<String>,
+    program_name: Option<String>,
+    table: Option<Table>,
+    detailed_tests: Option<Vec<DetailedTest>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "UnitTestUnchecked")]
 struct UnitTest {
     title: Option<String>,
     /// This field specify the reference to the program that will be tested by this instance
     /// of unit test. It may be the standard name of the program (`program<number>`, with
     /// `<number>` any of 1, 2, ...) or its alias. It is invalid to specify a name that was
     /// not defined in the input scope.
-    program_name: String,
+    ///
+    /// # Caveats
+    /// - If no program name is specified (None), it will logically default to the main
+    ///   program (`program1` or `p1`).
+    program_name: Option<String>,
     table: Option<Table>,
     detailed_tests: Vec<DetailedTest>,
+}
+
+impl UnitTest {
+    fn build(
+        title: Option<String>,
+        program_name: Option<String>,
+        table: Option<Table>,
+        detailed_tests: Vec<DetailedTest>,
+    ) -> Result<Self, &'static str> {
+        if table.is_none() && detailed_tests.is_empty() {
+            return Err("each UnitTest must have at least one table test or detailed test");
+        }
+        Ok(Self {
+            title,
+            program_name,
+            table,
+            detailed_tests,
+        })
+    }
+}
+
+impl TryFrom<UnitTestUnchecked> for UnitTest {
+    type Error = &'static str;
+
+    fn try_from(value: UnitTestUnchecked) -> Result<Self, Self::Error> {
+        let UnitTestUnchecked {
+            title,
+            program_name,
+            table,
+            detailed_tests,
+        } = value;
+
+        UnitTest::build(
+            title,
+            program_name,
+            table,
+            detailed_tests.unwrap_or_default(),
+        )
+    }
 }
 
 type Key = String;
 type Value = String;
 type Command = String;
 
+// TODO (checkpoint): validate if tests are not empty
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct UnitTests {
     env: Vec<(Key, Value)>,
@@ -1004,6 +1096,202 @@ mod tests {
         );
     }
 
+    mod test_unit_test {
+        use crate::configuration::{DetailedTest, Table, UnitTest};
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_full,
+            UnitTest {
+                title: Some("test1".to_string()),
+                program_name: Some("p1".to_string()),
+                table: Some(Table::new_dummy()),
+                detailed_tests: vec![DetailedTest::new_dummy(1)]
+            },
+            UnitTest
+        );
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_with_detailed_test,
+            UnitTest {
+                title: Some("test1".to_string()),
+                program_name: Some("p1".to_string()),
+                table: None,
+                detailed_tests: vec![DetailedTest::new_dummy(1)]
+            },
+            UnitTest
+        );
+
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_table_test,
+            UnitTest {
+                title: None,
+                program_name: None,
+                table: Some(Table::new_dummy()),
+                detailed_tests: vec![]
+            },
+            UnitTest
+        );
+
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_no_content_string, r#"\n"#, UnitTest);
+        test_invalid_deserialization!(should_panic_with_empty_object, r#"{}"#, UnitTest);
+        test_invalid_deserialization!(
+            should_panic_with_wrong_fields,
+            r#"
+        {
+            "wrong field":123
+        }"#,
+            UnitTest
+        );
+        test_invalid_deserialization!(
+            should_panic_without_tests,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "table":null
+        }"#,
+            UnitTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_empty_detailed_tests,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "detailed_tests":[]
+        }"#,
+            UnitTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_field,
+            r#"
+        {
+            "titli":"name 1",
+            "program_name":"main",
+            "table":[
+                ["name", "args", "status"],
+                ["test 1", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ]
+        }"#,
+            UnitTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_extra_field,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "extra":false,
+            "table":[
+                ["name", "args", "status"],
+                ["test 1", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ]
+        }"#,
+            UnitTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_duplicated_field,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "table":[
+                ["name", "args", "status"],
+                ["test", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ],
+            "table":[
+                ["name", "args", "status"],
+                ["test 1", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ]
+        }"#,
+            UnitTest
+        );
+        // valid deserialization
+        test_valid_deserialization!(
+            should_accept_with_table,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "table":[
+                ["name", "args", "status"],
+                ["test 1", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ]
+        }"#,
+            UnitTest
+        );
+
+        test_valid_deserialization!(
+            should_accept_with_table_tests_but_empty_detailed_test,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "table":[
+                ["name", "args", "status"],
+                ["test 1", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ],
+            "detailed_tests":[
+
+            ]
+        }"#,
+            UnitTest
+        );
+        test_valid_deserialization!(
+            should_accept_with_full,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "table":[
+                ["name", "args", "status"],
+                ["test 1", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ],
+            "detailed_tests":[
+                {
+                    "args":"a1 a2 a3",
+                    "name":"test 1",
+                    "status":0,
+                    "stdout":"hello world"
+                }
+            ]
+        }"#,
+            UnitTest
+        );
+        test_valid_deserialization!(
+            should_accept_with_detailed_test,
+            r#"
+        {
+            "title":"name 1",
+            "program_name":"main",
+            "detailed_tests":[
+                {
+                    "args":"a1 a2 a3",
+                    "name":"test 1",
+                    "status":0,
+                    "stdout":"hello world"
+                }
+            ]
+        }"#,
+            UnitTest
+        );
+    }
+
     mod test_configuration {
         use super::*;
 
@@ -1030,7 +1318,7 @@ mod tests {
                         teardown: vec![],
                         tests: vec![UnitTest {
                             title: None,
-                            program_name: "p1".to_string(),
+                            program_name: Some("p1".to_string()),
                             table: Some(Table {
                                 row_size: 3,
                                 header: vec![
