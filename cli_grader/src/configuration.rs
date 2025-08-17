@@ -249,19 +249,81 @@ impl<'de> Deserialize<'de> for Table {
     }
 }
 
-// TODO (checkpoint) use tryFrom from an unchecked DetaileTest type and validate during that
-// process.
-// Reference: https://users.rust-lang.org/t/struct-members-validation-on-serde-json-deserialize/123201/16
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-struct DetailedTest {
+#[serde(deny_unknown_fields)]
+struct DetailedTestUnchecked {
     name: Option<String>,
+    weight: Option<u32>,
+    // input
     args: Option<String>,
+    stdin: Option<String>,
+    // expect
     stdout: Option<String>,
     stderr: Option<String>,
     status: Option<i32>,
-    weight: Option<u32>,
 }
 
+// Reference: https://users.rust-lang.org/t/struct-members-validation-on-serde-json-deserialize/123201/16
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "DetailedTestUnchecked")]
+struct DetailedTest {
+    name: Option<String>,
+    weight: Option<u32>,
+    // input
+    args: Option<String>,
+    stdin: Option<String>,
+    // expect
+    stdout: Option<String>,
+    stderr: Option<String>,
+    status: Option<i32>,
+}
+
+impl DetailedTest {
+    fn build(
+        name: Option<String>,
+        weight: Option<u32>,
+        args: Option<String>,
+        stdin: Option<String>,
+        stdout: Option<String>,
+        stderr: Option<String>,
+        status: Option<i32>,
+    ) -> Result<Self, &'static str> {
+        if stdout.is_none() && stderr.is_none() && status.is_none() {
+            return Err("at least one of {stdout, stderr, status} must be non-null");
+        }
+        Ok(Self {
+            name,
+            weight,
+            args,
+            stdin,
+            stdout,
+            stderr,
+            status,
+        })
+    }
+}
+
+impl TryFrom<DetailedTestUnchecked> for DetailedTest {
+    type Error = String;
+
+    fn try_from(value: DetailedTestUnchecked) -> Result<Self, Self::Error> {
+        let DetailedTestUnchecked {
+            name,
+            weight,
+            args,
+            stdin,
+            stdout,
+            stderr,
+            status,
+        } = value;
+
+        DetailedTest::build(name, weight, args, stdin, stdout, stderr, status).map_err(String::from)
+    }
+}
+
+// TODO (checkpoint): this element will validated to check if at least it has one table or one
+// detailed test. The validation for the program_name to check if it is in the scope will be
+// done only after configuration is parsed. It will call a function to validate it.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct UnitTest {
     title: Option<String>,
@@ -806,6 +868,142 @@ mod tests {
         );
     }
 
+    mod test_detailed_test {
+        use crate::configuration::DetailedTest;
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_full,
+            DetailedTest {
+                name: Some("Name 1".to_string()),
+                weight: Some(2),
+                args: Some("a1 a2 a3".to_string()),
+                stdin: Some("input 1".to_string()),
+                stdout: Some("stdout1".to_string()),
+                stderr: Some("stderr1".to_string()),
+                status: Some(2),
+            },
+            DetailedTest
+        );
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_not_full,
+            DetailedTest {
+                name: None,
+                stdin: None,
+                args: None,
+                stdout: None,
+                stderr: None,
+                status: Some(2),
+                weight: None,
+            },
+            DetailedTest
+        );
+
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_no_content_string, r#"\n"#, DetailedTest);
+        test_invalid_deserialization!(should_panic_with_empty_object, r#"{}"#, DetailedTest);
+        test_invalid_deserialization!(
+            should_panic_with_wrong_fields,
+            r#"
+        {
+            "wrong field":123
+        }"#,
+            DetailedTest
+        );
+        test_invalid_deserialization!(
+            should_panic_without_check_fields,
+            r#"
+        {
+            "name":"name 1",
+            "args":"arg1",
+            "weight":2
+        }"#,
+            DetailedTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_type,
+            r#"
+        {
+            "name":"name 1",
+            "args":"arg1",
+            "status":"34",
+            "weight":2
+        }"#,
+            DetailedTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_field_name,
+            r#"
+        {
+            "name":"name 1",
+            "arg":"arg1",
+            "status":34,
+            "weight":2
+        }"#,
+            DetailedTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_extra_field,
+            r#"
+        {
+            "name":"name 1",
+            "args":"arg1",
+            "_extra":23,
+            "status":34,
+            "weight":2
+        }"#,
+            DetailedTest
+        );
+        test_invalid_deserialization!(
+            should_panic_with_duplicated_field,
+            r#"
+        {
+            "name":"name 1",
+            "args":"arg1",
+            "name":"name 1",
+            "status":34,
+            "name":"name 1",
+            "weight":2
+        }"#,
+            DetailedTest
+        );
+
+        // valid deserialization
+        test_valid_deserialization!(
+            should_accept_complete,
+            r#"
+        {
+            "name":"name 1",
+            "args":"arg1",
+            "status":34,
+            "stderr":"",
+            "stdout":"",
+            "weight":2
+        }"#,
+            DetailedTest
+        );
+        test_valid_deserialization!(
+            should_accept_basic1,
+            r#"
+        {
+            "stdin":"",
+            "name":"name 1",
+            "args":"arg1",
+            "status":34,
+            "weight":2
+        }"#,
+            DetailedTest
+        );
+        test_valid_deserialization!(
+            should_accept_basic2,
+            r#"
+        {
+            "status":34
+        }"#,
+            DetailedTest
+        );
+    }
+
     mod test_configuration {
         use super::*;
 
@@ -849,6 +1047,7 @@ mod tests {
                             detailed_tests: vec![DetailedTest {
                                 name: Some("test2".to_string()),
                                 args: Some("a1 a2 a3 a4".to_string()),
+                                stdin: None,
                                 stdout: None,
                                 stderr: None,
                                 status: Some(23),
@@ -861,10 +1060,6 @@ mod tests {
             Configuration
         );
 
-        // TODO (checkpoint): add more tests (testing serde using unit serde_test) and check
-        // each odd serde_json serialization/deserialization in isolated unit tests.
-        // Also, fix any inconsistency in the invalid configuration tests, adding new ones
-        // if necessary.
         test_invalid_deserialization!(should_panic_with_empty_json, r#"{}"#, Configuration);
         test_invalid_deserialization!(
             should_panic_with_strange_data,
