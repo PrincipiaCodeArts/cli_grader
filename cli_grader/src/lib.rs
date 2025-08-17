@@ -1,12 +1,13 @@
 /*
 mod input;
-mod report;
 */
 
 #[allow(dead_code)]
 mod grader;
 
+#[allow(dead_code)]
 mod configuration;
+mod report;
 
 pub use grader::Grader;
 pub use grader::GradingConfig;
