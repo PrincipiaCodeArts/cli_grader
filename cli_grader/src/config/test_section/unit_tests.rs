@@ -1,7 +1,7 @@
 use serde::{
-    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
+    Deserialize, Serialize,
 };
 use std::{collections::HashSet, iter};
 

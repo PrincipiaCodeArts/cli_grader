@@ -1,9 +1,9 @@
 use crate::{
-    GradingConfig, LoggingMode,
     config::{
         grading_section::GradingSection, input_section::InputSection,
         report_section::ReportSection, test_section::TestSection,
     },
+    GradingConfig, LoggingMode,
 };
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +52,22 @@ impl GlobalConfig {
     ) -> Result<Self, &'static str> {
         if sections.is_empty() {
             return Err("at least one test section is expected");
+        }
+
+        let available_program_names = input.available_program_names().map_err(|_| "Invalid alias: duplicated name. Aliases should not have the form \"p<number>\" or \"program<number>\" nor be duplicated with other aliases")?;
+
+        for s in &sections {
+            match &s.tests {
+                test_section::Tests::UnitTests(unit_tests) => {
+                    for t in &unit_tests.tests {
+                        if let Some(name) = &t.program_name
+                            && !available_program_names.contains(name)
+                        {
+                            return Err("program name out of scope");
+                        }
+                    }
+                }
+            }
         }
 
         Ok(Self {
@@ -404,6 +420,126 @@ mod tests {
         }"#,
             GlobalConfig
         );
+        test_invalid_deserialization!(
+            should_panic_with_program_name_out_of_scope,
+            r#"
+        {
+          "title": "Configuration ABC",
+          "author": "Author ABC",
+          "input": {
+            "input_programs": [
+              "exe",
+              {
+                "alias": "programY",
+                "program_type":"exe"
+              },
+              {
+                "alias": "programZ",
+                "program_type":"exe"
+              }
+            ]
+          },
+          "sections": [
+            {
+              "title": "Section 1",
+              "weight": 12,
+              "unit_tests": {
+                "env": [],
+                "setup": [],
+                "teardown": [],
+                "tests": [
+                  {
+                    "title": null,
+                    "program_name": "p4",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ],
+                    "detailed_tests": [
+                      {
+                        "name": "test2",
+                        "args": "a1 a2 a3 a4",
+                        "stdout": null,
+                        "stderr": null,
+                        "status": 23,
+                        "weight": 2
+                      },
+                      {
+                        "name": "testABC",
+                        "args": "a1",
+                        "status": -1,
+                        "weight": 3
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "title": "Section 2",
+              "weight": 2,
+              "unit_tests": {
+                "env": [],
+                "setup": [],
+                "teardown": [],
+                "tests": [
+                  {
+                    "title": null,
+                    "program_name": "programY",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ],
+                    "detailed_tests": [
+                      {
+                        "name": "test2",
+                        "args": "a1 a2 a3 a4",
+                        "stdout": null,
+                        "stderr": null,
+                        "status": 23,
+                        "weight": 2
+                      },
+                      {
+                        "name": "testABC",
+                        "args": "a1",
+                        "status": -1,
+                        "weight": 3
+                      }
+                    ]
+                  },
+                  {
+                    "program_name": "program3",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ]
+                  },
+                  {
+                    "program_name": "programZ",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }"#,
+            GlobalConfig
+        );
 
         // valid
         test_valid_deserialization!(
@@ -467,6 +603,134 @@ mod tests {
                         "status": -1,
                         "weight": 3
                       }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }"#,
+            GlobalConfig
+        );
+        test_valid_deserialization!(
+            should_accept_programs_with_aliases,
+            r#"
+        {
+          "title": "Configuration ABC",
+          "author": "Author ABC",
+          "logging_mode": "silent",
+          "grading": {
+            "mode": "weighted"
+          },
+          "report": {
+            "is_verbose": true,
+            "output": "txt"
+          },
+          "input": {
+            "input_programs": [
+              "exe",
+              {
+                "alias": "programY",
+                "program_type":"exe"
+              },
+              {
+                "alias": "programZ",
+                "program_type":"exe"
+              }
+            ]
+          },
+          "sections": [
+            {
+              "title": "Section 1",
+              "weight": 12,
+              "unit_tests": {
+                "env": [],
+                "setup": [],
+                "teardown": [],
+                "tests": [
+                  {
+                    "title": null,
+                    "program_name": "p1",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ],
+                    "detailed_tests": [
+                      {
+                        "name": "test2",
+                        "args": "a1 a2 a3 a4",
+                        "stdout": null,
+                        "stderr": null,
+                        "status": 23,
+                        "weight": 2
+                      },
+                      {
+                        "name": "testABC",
+                        "args": "a1",
+                        "status": -1,
+                        "weight": 3
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "title": "Section 2",
+              "weight": 2,
+              "unit_tests": {
+                "env": [],
+                "setup": [],
+                "teardown": [],
+                "tests": [
+                  {
+                    "title": null,
+                    "program_name": "programY",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ],
+                    "detailed_tests": [
+                      {
+                        "name": "test2",
+                        "args": "a1 a2 a3 a4",
+                        "stdout": null,
+                        "stderr": null,
+                        "status": 23,
+                        "weight": 2
+                      },
+                      {
+                        "name": "testABC",
+                        "args": "a1",
+                        "status": -1,
+                        "weight": 3
+                      }
+                    ]
+                  },
+                  {
+                    "program_name": "program3",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
+                    ]
+                  },
+                  {
+                    "program_name": "programZ",
+                    "table": [
+                      ["args",                "name",  "stdout"],
+                      ["arg1 arg2 arg3",      "test1", "expected1"],
+                      ["a1 a2 ",              "test2", "expected2"],
+                      ["arg1 arg2 arg3 arg4", "test3", "expected3"],
+                      ["",                    "test4", "expected4"]
                     ]
                   }
                 ]

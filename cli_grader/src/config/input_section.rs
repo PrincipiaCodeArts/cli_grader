@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
-enum InputType {
+pub(crate) enum InputType {
     #[default]
     #[serde(rename = "exe")]
     CompiledProgram,
@@ -9,7 +10,7 @@ enum InputType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(untagged, deny_unknown_fields)]
-enum ProgramSpecification {
+pub(crate) enum ProgramSpecification {
     OnlyType(InputType),
     Complete {
         /// This will be used to allow alternative argument naming for the CLI. Also, it
@@ -44,14 +45,44 @@ impl Default for ProgramSpecification {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct InputSection {
+struct InputSectionUnchecked {
+    input_programs: Option<Vec<ProgramSpecification>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "InputSectionUnchecked")]
+pub(crate) struct InputSection {
     /// This vector will define all the programs that will be available in the scope of the
     /// test.
     ///
     /// # Default
     /// Defaults to only one program with the standard name: "program1" and one additional  "p1"
-    #[serde(default)]
     input_programs: Vec<ProgramSpecification>,
+}
+
+impl InputSection {
+    pub(crate) fn available_program_names(&self) -> Result<HashSet<String>, String> {
+        let mut r = HashSet::with_capacity(self.input_programs.len() * 2);
+        for i in 0..self.input_programs.len() {
+            r.insert(format!("p{}", i + 1));
+            r.insert(format!("program{}", i + 1));
+        }
+
+        for p in self.input_programs.iter() {
+            if let ProgramSpecification::Complete {
+                alias,
+                program_type: _,
+            } = p
+            {
+                if r.insert(alias.clone()) {
+                    continue;
+                }
+                return Err(format!("duplicated alias: \"{alias}\""));
+            }
+        }
+
+        Ok(r)
+    }
 }
 
 impl Default for InputSection {
@@ -61,6 +92,22 @@ impl Default for InputSection {
         }
     }
 }
+
+impl TryFrom<InputSectionUnchecked> for InputSection {
+    type Error = &'static str;
+
+    fn try_from(value: InputSectionUnchecked) -> Result<Self, Self::Error> {
+        let InputSectionUnchecked { input_programs } = value;
+        match input_programs {
+            Some(input_programs) if !input_programs.is_empty() => {
+                Ok(InputSection { input_programs })
+            }
+            None => Ok(InputSection::default()),
+            _ => Err("input_program array may not be empty"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,13 +221,6 @@ mod tests {
 
         // serialization
         test_serialize_and_deserialize!(
-            should_serialize_deserialize_with_empty_input_programs,
-            InputSection {
-                input_programs: vec![]
-            },
-            InputSection
-        );
-        test_serialize_and_deserialize!(
             should_serialize_deserialize_with_input_programs,
             InputSection {
                 input_programs: vec![
@@ -247,19 +287,17 @@ mod tests {
         }"#,
             InputSection
         );
-
-        // valid
-        test_valid_deserialization!(should_accept_empty, r#"{}"#, InputSection);
-        // For serialization purpose, this case is acceptable, but for application logic, it
-        // may not be accepted.
-        test_valid_deserialization!(
-            should_accept_empty_input_programs,
+        test_invalid_deserialization!(
+            should_panic_empty_input_programs,
             r#"
         {
             "input_programs": []
         }"#,
             InputSection
         );
+
+        // valid
+        test_valid_deserialization!(should_accept_empty, r#"{}"#, InputSection);
         test_valid_deserialization!(
             should_accept_with_input_programs,
             r#"
