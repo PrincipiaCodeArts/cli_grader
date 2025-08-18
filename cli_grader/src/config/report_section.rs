@@ -11,7 +11,7 @@ pub struct ReportSection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::configuration::test_macros::{
+    use crate::config::test_macros::{
         test_invalid_deserialization, test_serialize_and_deserialize, test_valid_deserialization,
     };
 

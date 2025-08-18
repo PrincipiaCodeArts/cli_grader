@@ -1,4 +1,4 @@
-use crate::configuration::test_section::unit_tests::UnitTests;
+use crate::config::test_section::unit_tests::UnitTests;
 use serde::{Deserialize, Serialize};
 
 /*
@@ -6,7 +6,7 @@ mod performance_tests;
 mod integration_tests;
  */
 
-pub mod unit_tests;
+pub(crate) mod unit_tests;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -18,18 +18,37 @@ struct TestSectionUnchecked {
     // performance_tests: PerformanceTests,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(try_from = "TestSectionUnchecked")]
-pub struct TestSection {
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub(crate) enum Tests {
+    UnitTests(UnitTests),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(try_from = "TestSectionUnchecked", into = "TestSectionUnchecked")]
+pub(crate) struct TestSection {
     pub title: Option<String>,
     pub weight: Option<u32>,
-    /// # Caveats
-    /// This field is optional for future purposes. In the future, it will be demanded that
-    /// exactly one of `unit_tests`, `integration_tests`, or `performance_tests` is
-    /// present.
-    pub unit_tests: Option<UnitTests>,
+    pub tests: Tests,
     // integration_tests: IntegrationTests,
     // performance_tests: PerformanceTests,
+}
+
+impl From<TestSection> for TestSectionUnchecked {
+    fn from(val: TestSection) -> Self {
+        let TestSection {
+            title,
+            weight,
+            tests,
+        } = val;
+
+        match tests {
+            Tests::UnitTests(unit_tests) => TestSectionUnchecked {
+                title,
+                weight,
+                unit_tests: Some(unit_tests),
+            },
+        }
+    }
 }
 
 impl TestSection {
@@ -45,8 +64,12 @@ impl TestSection {
         Ok(Self {
             title,
             weight,
-            unit_tests,
+            tests: Tests::UnitTests(unit_tests.expect("unit_tests is not none at this point")),
         })
+    }
+
+    pub(crate) fn build_grading_section(&self) -> crate::grader::GradingTestSection {
+        todo!()
     }
 }
 
@@ -69,7 +92,7 @@ mod tests {
 
     mod test_test_section {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };
@@ -80,7 +103,7 @@ mod tests {
             TestSection {
                 title: Some("section 1".to_string()),
                 weight: None,
-                unit_tests: Some(UnitTests::new_dummy()),
+                tests: Tests::UnitTests(UnitTests::new_dummy())
             },
             TestSection
         );

@@ -5,7 +5,7 @@ use serde::{
 };
 use std::{collections::HashSet, iter};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum TableHeaderType {
     Name,
@@ -45,14 +45,14 @@ impl TableHeaderType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(untagged)]
 pub enum TableCellContent {
     Int(i64),
     String(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Table {
     pub row_size: usize,
     pub header: Vec<TableHeaderType>,
@@ -206,7 +206,7 @@ struct DetailedTestUnchecked {
 }
 
 // Reference: https://users.rust-lang.org/t/struct-members-validation-on-serde-json-deserialize/123201/16
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "DetailedTestUnchecked")]
 pub struct DetailedTest {
     pub name: Option<String>,
@@ -286,7 +286,7 @@ struct UnitTestUnchecked {
     detailed_tests: Vec<DetailedTest>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "UnitTestUnchecked")]
 pub struct UnitTest {
     pub title: Option<String>,
@@ -363,7 +363,7 @@ struct UnitTestsUnchecked {
     tests: Vec<UnitTest>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "UnitTestsUnchecked")]
 pub struct UnitTests {
     pub env: Vec<(Key, Value)>,
@@ -421,7 +421,7 @@ mod tests {
     use super::*;
     mod test_table_cell_content {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };
@@ -464,7 +464,7 @@ mod tests {
 
     mod test_table {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };
@@ -589,7 +589,7 @@ mod tests {
 
     mod test_detailed_test {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };
@@ -729,7 +729,7 @@ mod tests {
 
     mod test_unit_test {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };
@@ -929,7 +929,7 @@ mod tests {
 
     mod test_unit_tests {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };

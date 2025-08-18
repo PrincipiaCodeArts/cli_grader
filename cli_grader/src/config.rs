@@ -1,6 +1,6 @@
 use crate::{
-    LoggingMode,
-    configuration::{
+    GradingConfig, LoggingMode,
+    config::{
         grading_section::GradingSection, input_section::InputSection,
         report_section::ReportSection, test_section::TestSection,
     },
@@ -14,7 +14,7 @@ mod test_section;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
-struct ConfigurationUnchecked {
+struct GlobalConfigUnchecked {
     title: String,
     author: Option<String>,
     #[serde(default)]
@@ -29,8 +29,8 @@ struct ConfigurationUnchecked {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(try_from = "ConfigurationUnchecked")]
-struct Configuration {
+#[serde(try_from = "GlobalConfigUnchecked")]
+struct GlobalConfig {
     title: String,
     author: Option<String>,
     logging_mode: LoggingMode,
@@ -40,7 +40,7 @@ struct Configuration {
     sections: Vec<TestSection>,
 }
 
-impl Configuration {
+impl GlobalConfig {
     fn build(
         title: String,
         author: Option<String>,
@@ -64,13 +64,23 @@ impl Configuration {
             sections,
         })
     }
+
+    fn build_grader_config(&self) -> GradingConfig {
+        let mut c = GradingConfig::new(self.title.clone(), self.author.clone(), self.grading.mode);
+
+        for t in &self.sections {
+            c.add_grading_section(t.build_grading_section());
+        }
+
+        c
+    }
 }
 
-impl TryFrom<ConfigurationUnchecked> for Configuration {
+impl TryFrom<GlobalConfigUnchecked> for GlobalConfig {
     type Error = &'static str;
 
-    fn try_from(value: ConfigurationUnchecked) -> Result<Self, Self::Error> {
-        let ConfigurationUnchecked {
+    fn try_from(value: GlobalConfigUnchecked) -> Result<Self, Self::Error> {
+        let GlobalConfigUnchecked {
             title,
             author,
             logging_mode,
@@ -80,7 +90,7 @@ impl TryFrom<ConfigurationUnchecked> for Configuration {
             sections,
         } = value;
 
-        Configuration::build(
+        GlobalConfig::build(
             title,
             author,
             logging_mode,
@@ -155,9 +165,10 @@ mod tests {
 
     mod test_configuration {
         use super::*;
-        use crate::grader::score::Mode as GradingMode;
+        use crate::config::test_section::Tests;
+        use crate::grader::score::GradingMode;
         use crate::{
-            configuration::{
+            config::{
                 test_macros::{
                     test_invalid_deserialization, test_serialize_and_deserialize,
                     test_valid_deserialization,
@@ -171,7 +182,7 @@ mod tests {
 
         test_serialize_and_deserialize!(
             should_serialize_and_deserialize,
-            Configuration {
+            GlobalConfig {
                 title: "configuration 1".to_string(),
                 author: None,
                 logging_mode: LoggingMode::Silent,
@@ -186,7 +197,7 @@ mod tests {
                 sections: vec![TestSection {
                     title: Some("Section 1".to_string()),
                     weight: Some(12),
-                    unit_tests: Some(UnitTests {
+                    tests: Tests::UnitTests(UnitTests {
                         env: vec![],
                         setup: vec![],
                         teardown: vec![],
@@ -219,11 +230,11 @@ mod tests {
                     }),
                 }],
             },
-            Configuration
+            GlobalConfig
         );
 
         // invalid
-        test_invalid_deserialization!(should_panic_with_empty_json, r#"{}"#, Configuration);
+        test_invalid_deserialization!(should_panic_with_empty_json, r#"{}"#, GlobalConfig);
         test_invalid_deserialization!(
             should_panic_with_strange_data,
             r#"
@@ -235,7 +246,7 @@ mod tests {
                 "+44 2345678"
             ]
         }"#,
-            Configuration
+            GlobalConfig
         );
         test_invalid_deserialization!(
             should_panic_with_invalid_grading_mode,
@@ -297,7 +308,7 @@ mod tests {
             }
           ]
         }"#,
-            Configuration
+            GlobalConfig
         );
         test_invalid_deserialization!(
             should_panic_with_invalid_report_output_mode,
@@ -360,7 +371,7 @@ mod tests {
             }
           ]
         }"#,
-            Configuration
+            GlobalConfig
         );
         test_invalid_deserialization!(
             should_panic_with_empty_section,
@@ -391,7 +402,7 @@ mod tests {
           },
           "sections": []
         }"#,
-            Configuration
+            GlobalConfig
         );
 
         // valid
@@ -463,7 +474,7 @@ mod tests {
             }
           ]
         }"#,
-            Configuration
+            GlobalConfig
         );
         test_valid_deserialization!(
             should_accept_with_mandatory_fields_only,
@@ -511,7 +522,7 @@ mod tests {
             }
           ]
         }"#,
-            Configuration
+            GlobalConfig
         );
     }
 }

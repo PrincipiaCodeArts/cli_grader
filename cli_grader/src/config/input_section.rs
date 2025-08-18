@@ -66,7 +66,7 @@ mod tests {
     use super::*;
     mod test_program_specification {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };
@@ -167,7 +167,7 @@ mod tests {
 
     mod test_input_section {
         use super::*;
-        use crate::configuration::test_macros::{
+        use crate::config::test_macros::{
             test_invalid_deserialization, test_serialize_and_deserialize,
             test_valid_deserialization,
         };

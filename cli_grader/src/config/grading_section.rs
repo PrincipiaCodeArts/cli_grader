@@ -1,4 +1,4 @@
-use crate::grader::score::Mode as GradingMode;
+use crate::grader::score::GradingMode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]

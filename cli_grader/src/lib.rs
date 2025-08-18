@@ -1,18 +1,16 @@
-/*
-mod input;
-*/
-
 #[allow(dead_code)]
 mod grader;
 
 #[allow(dead_code)]
-mod configuration;
+mod config;
+#[allow(dead_code)]
+mod input;
 mod report;
 
 pub use grader::Grader;
 pub use grader::GradingConfig;
 pub use grader::GradingResult;
-pub use grader::score::Mode;
+pub use grader::score::GradingMode;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -30,8 +28,8 @@ pub fn add(left: u64, right: u64) -> u64 {
     // use grader
     let conf = GradingConfig::new(
         "Test".to_string(),
-        "test author".to_string(),
-        Mode::Weighted,
+        Some("test author".to_string()),
+        GradingMode::Weighted,
     );
     let grader = Grader::new(&conf);
     grader.run();
