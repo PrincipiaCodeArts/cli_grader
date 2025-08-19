@@ -24,6 +24,21 @@ impl UnitTest {
             assertions: vec![],
         }
     }
+
+    #[cfg(test)]
+    pub fn new_for_test(
+        name: String,
+        executable: ExecutableArtifact,
+        assertions: Vec<Assertion>,
+    ) -> Self {
+        Self {
+            name,
+            executable,
+            assertions,
+        }
+    }
+
+    #[cfg(test)]
     pub fn with_assertion(mut self, assertion: Assertion) -> Self {
         self.assertions.push(assertion);
         self
@@ -31,6 +46,15 @@ impl UnitTest {
 
     pub(crate) fn add_assertion(&mut self, assertion: Assertion) {
         self.assertions.push(assertion);
+    }
+
+    pub(crate) fn add_assertions(&mut self, assertions: Vec<Assertion>) {
+        self.assertions.extend(assertions);
+    }
+
+    /// Get the number of assertions.
+    pub(crate) fn size(&self) -> usize {
+        self.assertions.len()
     }
 
     fn run(

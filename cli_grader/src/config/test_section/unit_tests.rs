@@ -320,7 +320,7 @@ impl DetailedTest {
         })
     }
 
-    fn build_grading_assertions(&self, n: usize) -> Result<UnitTestAssertion, &'static str> {
+    fn build_grading_assertion(&self, n: usize) -> Result<UnitTestAssertion, &'static str> {
         let DetailedTest {
             name,
             weight,
@@ -436,21 +436,30 @@ impl UnitTest {
     ) -> Result<GradingUnitTest, &'static str> {
         // try to get the executable
         let default_name = format!("Unit Test {n}");
+        // TODO (move to a const)
         let default_program_name = "program1".to_string();
         let executable =
             executables_by_name.get(self.program_name.as_ref().unwrap_or(&default_program_name));
         if executable.is_none() {
             return Err("executable not found");
         }
-        let unit_test = GradingUnitTest::new(
+        let mut unit_test = GradingUnitTest::new(
             self.title.as_ref().unwrap_or(&default_name).clone(),
             executable.unwrap().clone(),
         );
 
         // add assertions
-        todo!();
-        //unit_test.add_assertion(assertion);
+        // table
+        if let Some(table) = &self.table {
+            unit_test.add_assertions(table.build_grading_assertions(1)?);
+        }
 
+        // detailed tests
+        let mut n = unit_test.size() + 1;
+        for d in &self.detailed_tests {
+            unit_test.add_assertion(d.build_grading_assertion(n)?);
+            n += 1;
+        }
         Ok(unit_test)
     }
 
@@ -719,7 +728,7 @@ mod tests {
             Table
         );
 
-        mod test_build_grading_assertion {
+        mod test_build_grading_assertions {
             use super::*;
 
             #[test]
@@ -1127,7 +1136,7 @@ mod tests {
                     stderr: None,
                     status: None,
                 };
-                invalid_table.build_grading_assertions(1).unwrap();
+                invalid_table.build_grading_assertion(1).unwrap();
             }
             #[test]
             fn should_match_a_simple_detailed_test() {
@@ -1142,7 +1151,7 @@ mod tests {
                 )
                 .unwrap();
                 assert_eq!(
-                    t.build_grading_assertions(10).unwrap(),
+                    t.build_grading_assertion(10).unwrap(),
                     UnitTestAssertion::build(
                         "Assertion 10".to_string(),
                         vec![
@@ -1173,7 +1182,7 @@ mod tests {
                 )
                 .unwrap();
                 assert_eq!(
-                    t.build_grading_assertions(10).unwrap(),
+                    t.build_grading_assertion(10).unwrap(),
                     UnitTestAssertion::build(
                         "name abc".to_string(),
                         vec!["a1".to_string(), "a2".to_string(), "a3".to_string()],
@@ -1387,6 +1396,207 @@ mod tests {
         }"#,
             UnitTest
         );
+
+        mod test_build_grading_unit_test {
+            use super::*;
+            use std::path::PathBuf;
+            #[test]
+            #[should_panic]
+            fn should_panic_when_there_is_no_executable_for_given_program() {
+                let u = UnitTest::build(
+                    Some("UnitTest1".to_string()),
+                    Some("some program".to_string()),
+                    Some(
+                        Table::build(
+                            vec![
+                                TableHeaderType::Name,
+                                TableHeaderType::Args,
+                                TableHeaderType::Status,
+                            ],
+                            vec![
+                                vec![
+                                    TableCellContent::String("test 1".to_string()),
+                                    TableCellContent::String("a1 a2".to_string()),
+                                    TableCellContent::Int(0),
+                                ],
+                                vec![
+                                    TableCellContent::String("test 2".to_string()),
+                                    TableCellContent::String("a1 a2 a3".to_string()),
+                                    TableCellContent::Int(2),
+                                ],
+                            ],
+                        )
+                        .unwrap(),
+                    ),
+                    vec![],
+                )
+                .unwrap();
+
+                let executable = ExecutableArtifact::CompiledProgram {
+                    name: "some name".to_string(),
+                    path: PathBuf::new(),
+                };
+                let executables_by_name = HashMap::from_iter([
+                    ("not some program".to_string(), executable.clone()),
+                    ("program1".to_string(), executable.clone()),
+                    ("p1".to_string(), executable.clone()),
+                ]);
+                u.build_grading_unit_test(2, &executables_by_name).unwrap();
+            }
+
+            #[test]
+            #[should_panic]
+            fn should_panic_when_table_is_invalid() {
+                let invalid_unit_test = UnitTest {
+                    title: Some("UnitTest1".to_string()),
+                    program_name: Some("some program".to_string()),
+                    table: Some(Table {
+                        row_size: 2,
+                        header: vec![TableHeaderType::Name, TableHeaderType::Args],
+                        tests: vec![
+                            vec![
+                                TableCellContent::String("test 1".to_string()),
+                                TableCellContent::String("a1 a2".to_string()),
+                                TableCellContent::Int(0),
+                            ],
+                            vec![
+                                TableCellContent::String("test 2".to_string()),
+                                TableCellContent::String("a1 a2 a3".to_string()),
+                                TableCellContent::Int(2),
+                            ],
+                        ],
+                    }),
+                    detailed_tests: vec![],
+                };
+
+                let executable = ExecutableArtifact::CompiledProgram {
+                    name: "some name".to_string(),
+                    path: PathBuf::new(),
+                };
+                let executables_by_name = HashMap::from_iter([
+                    ("not some program".to_string(), executable.clone()),
+                    ("program1".to_string(), executable.clone()),
+                    ("p1".to_string(), executable.clone()),
+                ]);
+                invalid_unit_test
+                    .build_grading_unit_test(2, &executables_by_name)
+                    .unwrap();
+            }
+
+            #[test]
+            fn should_accept_unit_test_with_table_tests_and_detailed_tests() {
+                let u = UnitTest::build(
+                    Some("UnitTest1".to_string()),
+                    Some("some program".to_string()),
+                    Some(
+                        Table::build(
+                            vec![
+                                TableHeaderType::Name,
+                                TableHeaderType::Args,
+                                TableHeaderType::Status,
+                            ],
+                            vec![
+                                vec![
+                                    TableCellContent::String("test 1".to_string()),
+                                    TableCellContent::String("a1 a2".to_string()),
+                                    TableCellContent::Int(0),
+                                ],
+                                vec![
+                                    TableCellContent::String("test 2".to_string()),
+                                    TableCellContent::String("a1 a2 a3".to_string()),
+                                    TableCellContent::Int(2),
+                                ],
+                            ],
+                        )
+                        .unwrap(),
+                    ),
+                    vec![
+                        DetailedTest::build(
+                            None,
+                            Some(2),
+                            Some("a b c".to_string()),
+                            Some("stdin".to_string()),
+                            Some("".to_string()),
+                            None,
+                            Some(3),
+                        )
+                        .unwrap(),
+                        DetailedTest::build(
+                            Some("test abc".to_string()),
+                            None,
+                            Some("a b".to_string()),
+                            Some("stdin".to_string()),
+                            Some("".to_string()),
+                            None,
+                            Some(3),
+                        )
+                        .unwrap(),
+                    ],
+                )
+                .unwrap();
+
+                let executable = ExecutableArtifact::CompiledProgram {
+                    name: "some name".to_string(),
+                    path: PathBuf::new(),
+                };
+                // TODO (optimization): make the executables by name a map from string to a
+                // reference to an executable instead of the executable itself.
+                let executables_by_name = HashMap::from_iter([
+                    ("some program".to_string(), executable.clone()),
+                    ("program1".to_string(), executable.clone()),
+                ]);
+
+                assert_eq!(
+                    u.build_grading_unit_test(2, &executables_by_name).unwrap(),
+                    GradingUnitTest::new_for_test(
+                        "UnitTest1".to_string(),
+                        executable,
+                        vec![
+                            UnitTestAssertion::build(
+                                "test 1".to_string(),
+                                vec!["a1".to_string(), "a2".to_string()],
+                                None,
+                                None,
+                                None,
+                                Some(0),
+                                1
+                            )
+                            .unwrap(),
+                            UnitTestAssertion::build(
+                                "test 2".to_string(),
+                                vec!["a1".to_string(), "a2".to_string(), "a3".to_string()],
+                                None,
+                                None,
+                                None,
+                                Some(2),
+                                1
+                            )
+                            .unwrap(),
+                            UnitTestAssertion::build(
+                                "Assertion 3".to_string(),
+                                vec!["a".to_string(), "b".to_string(), "c".to_string()],
+                                Some("stdin".to_string()),
+                                Some("".to_string()),
+                                None,
+                                Some(3),
+                                2
+                            )
+                            .unwrap(),
+                            UnitTestAssertion::build(
+                                "test abc".to_string(),
+                                vec!["a".to_string(), "b".to_string()],
+                                Some("stdin".to_string()),
+                                Some("".to_string()),
+                                None,
+                                Some(3),
+                                1
+                            )
+                            .unwrap()
+                        ]
+                    )
+                );
+            }
+        }
     }
 
     mod test_unit_tests {
