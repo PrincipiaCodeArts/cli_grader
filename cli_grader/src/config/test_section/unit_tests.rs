@@ -320,6 +320,38 @@ impl DetailedTest {
         })
     }
 
+    fn build_grading_assertions(&self, n: usize) -> Result<UnitTestAssertion, &'static str> {
+        let DetailedTest {
+            name,
+            weight,
+            args: args_string,
+            stdin,
+            stdout,
+            stderr,
+            status,
+        } = self;
+        let mut args = vec![];
+
+        if let Some(args_string) = args_string {
+            let mut lex = Shlex::new(args_string.as_str());
+            for arg in lex.by_ref() {
+                args.push(arg);
+            }
+            if lex.had_error {
+                return Err("invalid args string");
+            }
+        }
+        UnitTestAssertion::build(
+            name.clone().unwrap_or(format!("Assertion {n}")),
+            args,
+            stdin.clone(),
+            stdout.clone(),
+            stderr.clone(),
+            *status,
+            weight.unwrap_or(1),
+        )
+    }
+
     #[cfg(test)]
     fn new_dummy(n: u32) -> Self {
         Self {
@@ -1079,6 +1111,82 @@ mod tests {
         }"#,
             DetailedTest
         );
+
+        mod test_build_grading_assertion {
+            use super::*;
+
+            #[test]
+            #[should_panic]
+            fn should_panic_when_assertion_is_not_built_properly() {
+                let invalid_table = DetailedTest {
+                    name: None,
+                    weight: Some(1),
+                    args: None,
+                    stdin: Some("stdin 1".to_string()),
+                    stdout: None,
+                    stderr: None,
+                    status: None,
+                };
+                invalid_table.build_grading_assertions(1).unwrap();
+            }
+            #[test]
+            fn should_match_a_simple_detailed_test() {
+                let t = DetailedTest::build(
+                    None,
+                    None,
+                    Some("arg1 arg2 \" an arg \"".to_string()),
+                    Some("".to_string()),
+                    Some("".to_string()),
+                    None,
+                    None,
+                )
+                .unwrap();
+                assert_eq!(
+                    t.build_grading_assertions(10).unwrap(),
+                    UnitTestAssertion::build(
+                        "Assertion 10".to_string(),
+                        vec![
+                            "arg1".to_string(),
+                            "arg2".to_string(),
+                            " an arg ".to_string()
+                        ],
+                        Some("".to_string()),
+                        Some("".to_string()),
+                        None,
+                        None,
+                        1,
+                    )
+                    .unwrap()
+                );
+            }
+
+            #[test]
+            fn should_match_a_full_detailed_test() {
+                let t = DetailedTest::build(
+                    Some("name abc".to_string()),
+                    Some(12),
+                    Some("a1 a2 a3".to_string()),
+                    Some("stdin abc".to_string()),
+                    Some("stdout abc".to_string()),
+                    Some("stderr abc".to_string()),
+                    Some(0),
+                )
+                .unwrap();
+                assert_eq!(
+                    t.build_grading_assertions(10).unwrap(),
+                    UnitTestAssertion::build(
+                        "name abc".to_string(),
+                        vec!["a1".to_string(), "a2".to_string(), "a3".to_string()],
+                        Some("stdin abc".to_string()),
+                        Some("stdout abc".to_string()),
+                        Some("stderr abc".to_string()),
+                        Some(0),
+                        12,
+                    )
+                    .unwrap()
+                );
+            }
+        }
     }
 
     mod test_unit_test {
