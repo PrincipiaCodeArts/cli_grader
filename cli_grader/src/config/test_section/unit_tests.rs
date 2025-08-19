@@ -544,7 +544,7 @@ impl UnitTests {
         })
     }
 
-    fn build_grading_unit_tests(
+    pub fn build_grading_unit_tests(
         &self,
         executables_by_name: &HashMap<String, ExecutableArtifact>,
     ) -> Result<GradingUnitTests, &'static str> {

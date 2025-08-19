@@ -87,18 +87,24 @@ impl GlobalConfig {
         })
     }
 
-    fn build_grader_config(&self) -> GradingConfig {
+    fn build_grading_config(&self) -> Result<GradingConfig, &'static str> {
         let mut c = GradingConfig::new(self.title.clone(), self.author.clone(), self.grading.mode);
 
-        for t in &self.sections {
-            c.add_grading_section(t.build_grading_section());
+        let executables_by_name = self
+            .executables_by_name
+            .clone()
+            .ok_or("executables per name map not initialized")?;
+
+        for (i, t) in self.sections.iter().enumerate() {
+            c.add_grading_section(t.build_grading_section(i + 1, &executables_by_name)?);
         }
 
-        c
+        Ok(c)
     }
 
+    // TODO (checkpoint)
     fn set_executables_by_name(&self) -> Result<(), &'static str> {
-        Ok(())
+        todo!()
     }
 }
 
@@ -801,5 +807,85 @@ mod tests {
         }"#,
             GlobalConfig
         );
+
+        mod test_build_grader_config {
+            use super::*;
+
+            #[test]
+            #[should_panic]
+            fn should_panic_whit_uninitialized_executables_by_name() {
+                let c = GlobalConfig {
+                    title: "test 1".to_string(),
+                    author: None,
+                    logging_mode: LoggingMode::Silent,
+                    grading: GradingSection {
+                        mode: GradingMode::Absolute,
+                    },
+                    report: ReportSection {
+                        is_verbose: false,
+                        output: ReportOutput::Txt,
+                    },
+                    input: InputSection::default(),
+                    sections: vec![
+                        TestSection::new_dummy(1),
+                        TestSection::new_dummy(2),
+                        TestSection::new_dummy(1),
+                    ],
+                    executables_by_name: None,
+                };
+
+                c.build_grading_config().unwrap();
+            }
+
+            #[test]
+            fn should_build_grading_config_properly() {
+                let executables_by_name = HashMap::from_iter([
+                    ("program1".to_string(), ExecutableArtifact::new_dummy(1)),
+                    ("program2".to_string(), ExecutableArtifact::new_dummy(2)),
+                    ("p1".to_string(), ExecutableArtifact::new_dummy(1)),
+                    ("p2".to_string(), ExecutableArtifact::new_dummy(2)),
+                ]);
+                let c = GlobalConfig {
+                    title: "test 1".to_string(),
+                    author: None,
+                    logging_mode: LoggingMode::Silent,
+                    grading: GradingSection {
+                        mode: GradingMode::Absolute,
+                    },
+                    report: ReportSection {
+                        is_verbose: false,
+                        output: ReportOutput::Txt,
+                    },
+                    input: InputSection::default(),
+                    sections: vec![
+                        TestSection::new_dummy(1),
+                        TestSection::new_dummy(2),
+                        TestSection::new_dummy(1),
+                    ],
+                    executables_by_name: Some(executables_by_name.clone()),
+                };
+
+                let mut expected =
+                    GradingConfig::new("test 1".to_string(), None, GradingMode::Absolute);
+
+                expected.add_grading_section(
+                    TestSection::new_dummy(1)
+                        .build_grading_section(1, &executables_by_name)
+                        .unwrap(),
+                );
+                expected.add_grading_section(
+                    TestSection::new_dummy(2)
+                        .build_grading_section(2, &executables_by_name)
+                        .unwrap(),
+                );
+                expected.add_grading_section(
+                    TestSection::new_dummy(1)
+                        .build_grading_section(1, &executables_by_name)
+                        .unwrap(),
+                );
+
+                assert_eq!(c.build_grading_config().unwrap(), expected);
+            }
+        }
     }
 }

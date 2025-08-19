@@ -1,5 +1,10 @@
-use crate::config::test_section::unit_tests::UnitTests;
+use crate::{
+    config::test_section::unit_tests::UnitTests,
+    grader::{GradingTestSection, grading_tests::GradingTests},
+    input::ExecutableArtifact,
+};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /*
 mod performance_tests;
@@ -19,18 +24,31 @@ struct TestSectionUnchecked {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub(crate) enum Tests {
+pub enum Tests {
     UnitTests(UnitTests),
+    // IntegrationTests(IntegrationTests),
+    // PerformanceTests(PerformanceTests),
+}
+
+impl Tests {
+    fn build_grading_tests(
+        &self,
+        executables_by_name: &HashMap<String, ExecutableArtifact>,
+    ) -> Result<GradingTests, &'static str> {
+        match self {
+            Tests::UnitTests(unit_tests) => Ok(GradingTests::UnitTests(
+                unit_tests.build_grading_unit_tests(executables_by_name)?,
+            )),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "TestSectionUnchecked", into = "TestSectionUnchecked")]
-pub(crate) struct TestSection {
+pub struct TestSection {
     pub title: Option<String>,
     pub weight: Option<u32>,
     pub tests: Tests,
-    // integration_tests: IntegrationTests,
-    // performance_tests: PerformanceTests,
 }
 
 impl From<TestSection> for TestSectionUnchecked {
@@ -68,8 +86,26 @@ impl TestSection {
         })
     }
 
-    pub(crate) fn build_grading_section(&self) -> crate::grader::GradingTestSection {
-        todo!()
+    pub fn build_grading_section(
+        &self,
+        n: usize,
+        executables_by_name: &HashMap<String, ExecutableArtifact>,
+    ) -> Result<GradingTestSection, &'static str> {
+        let tests = self.tests.build_grading_tests(executables_by_name)?;
+        Ok(GradingTestSection::new(
+            self.title.clone().unwrap_or(format!("Section {n}")),
+            self.weight.unwrap_or(1),
+            tests,
+        ))
+    }
+
+    #[cfg(test)]
+    pub fn new_dummy(n: usize) -> Self {
+        Self {
+            title: Some(format!("Section {n}")),
+            weight: Some(1),
+            tests: Tests::UnitTests(UnitTests::new_dummy()),
+        }
     }
 }
 

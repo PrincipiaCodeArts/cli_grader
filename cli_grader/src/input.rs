@@ -17,7 +17,7 @@ use std::{fmt::Debug, path::PathBuf, process::Command};
 ///   `ExecutableArtifact` may also appear in other formats, like Python source code or any
 ///   other programming languages' source code.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub(crate) enum ExecutableArtifact {
+pub enum ExecutableArtifact {
     CompiledProgram { name: String, path: PathBuf },
     // PythonProgram
     // JavascriptProgram
@@ -48,6 +48,14 @@ impl ExecutableArtifact {
     pub fn name(&self) -> String {
         match self {
             ExecutableArtifact::CompiledProgram { name, .. } => name.to_string(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_dummy(n: usize) -> Self {
+        Self::CompiledProgram {
+            name: format!("program{n}"),
+            path: PathBuf::from(format!("path{n}")),
         }
     }
 }

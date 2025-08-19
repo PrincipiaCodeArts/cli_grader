@@ -22,7 +22,7 @@ impl GradingTestSection {
         result
     }
 
-    fn new(name: String, weight: u32, tests: GradingTests) -> Self {
+    pub fn new(name: String, weight: u32, tests: GradingTests) -> Self {
         Self {
             name,
             weight,
