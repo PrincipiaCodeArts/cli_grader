@@ -1,6 +1,7 @@
 use crate::{
     grader::grading_tests::unit_test::{
         assertion::Assertion as UnitTestAssertion, UnitTest as GradingUnitTest,
+        UnitTests as GradingUnitTests,
     },
     input::ExecutableArtifact,
 };
@@ -492,12 +493,17 @@ impl TryFrom<UnitTestUnchecked> for UnitTest {
 type Key = String;
 type Value = String;
 type Command = String;
+type FileContent = String;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct UnitTestsUnchecked {
     #[serde(default)]
     env: Vec<(Key, Value)>,
+    #[serde(default)]
+    inherit_parent_env: Option<bool>,
+    #[serde(default)]
+    files: Vec<(String, FileContent)>,
     #[serde(default)]
     setup: Vec<Command>,
     #[serde(default)]
@@ -509,6 +515,8 @@ struct UnitTestsUnchecked {
 #[serde(try_from = "UnitTestsUnchecked")]
 pub struct UnitTests {
     pub env: Vec<(Key, Value)>,
+    pub inherit_parent_env: bool,
+    pub files: Vec<(String, FileContent)>,
     pub setup: Vec<Command>,
     pub teardown: Vec<Command>,
     pub tests: Vec<UnitTest>,
@@ -517,6 +525,8 @@ pub struct UnitTests {
 impl UnitTests {
     fn build(
         env: Vec<(Key, Value)>,
+        inherit_parent_env: bool,
+        files: Vec<(String, FileContent)>,
         setup: Vec<Command>,
         teardown: Vec<Command>,
         tests: Vec<UnitTest>,
@@ -526,16 +536,26 @@ impl UnitTests {
         }
         Ok(Self {
             env,
+            inherit_parent_env,
+            files,
             setup,
             teardown,
             tests,
         })
     }
 
+    /*
+    fn build_grading_unit_tests(&self) -> GradingUnitTests {
+        let r = GradingUnitTests::new(self.env, true, files, setup, teardown, unit_tests);
+    }
+    */
+
     #[cfg(test)]
     pub fn new_dummy() -> Self {
         Self {
             env: vec![("k1".to_string(), "v1".to_string())],
+            inherit_parent_env: true,
+            files: vec![("file1.txt".to_string(), "hello\nworld".to_string())],
             setup: vec!["s1".to_string(), "s2".to_string()],
             teardown: vec![],
             tests: vec![UnitTest::new_dummy(1), UnitTest::new_dummy(2)],
@@ -549,12 +569,21 @@ impl TryFrom<UnitTestsUnchecked> for UnitTests {
     fn try_from(value: UnitTestsUnchecked) -> Result<Self, Self::Error> {
         let UnitTestsUnchecked {
             env,
+            inherit_parent_env,
+            files,
             setup,
             teardown,
             tests,
         } = value;
 
-        UnitTests::build(env, setup, teardown, tests)
+        UnitTests::build(
+            env,
+            inherit_parent_env.unwrap_or(true),
+            files,
+            setup,
+            teardown,
+            tests,
+        )
     }
 }
 
@@ -1614,6 +1643,9 @@ mod tests {
                     ("k1".to_string(), "v1".to_string()),
                     ("k2".to_string(), "v2".to_string())
                 ],
+                inherit_parent_env: true,
+                files: vec![("file 1".to_string(), "content 1".to_string())],
+
                 setup: vec!["cmd1 abc".to_string(), "cmd2 abc".to_string()],
                 teardown: vec!["cmd1 abcd".to_string(), "cmd2 abcd".to_string()],
                 tests: vec![UnitTest::new_dummy(0), UnitTest::new_dummy(1)]
@@ -1624,6 +1656,8 @@ mod tests {
             should_serialize_deserialize_empty,
             UnitTests {
                 env: vec![],
+                inherit_parent_env: true,
+                files: vec![],
                 setup: vec![],
                 teardown: vec![],
                 tests: vec![UnitTest::new_dummy(0)]
@@ -1699,12 +1733,38 @@ mod tests {
 
         // valid deserialization
         test_valid_deserialization!(
-            should_accepct_full_test,
+            should_accept_minimal_test,
+            r#"
+        {
+            "tests": [
+                {
+                    "title":"name 1",
+                    "program_name":"main",
+                    "detailed_tests":[
+                        {
+                            "args":"a1 a2 a3",
+                            "name":"test 1",
+                            "status":0,
+                            "stdout":"hello world"
+                        }
+                    ]
+                }
+            ]
+        }"#,
+            UnitTests
+        );
+        test_valid_deserialization!(
+            should_accept_full_test,
             r#"
         {
             "env":[["k1","v1"], ["k2","v2"]],
             "teardown":["cmd2 abc", "cmd3"],
             "setup":["cmd1 abc"],
+            "inherit_parent_env":false,
+            "files":[
+                ["file1.txt", "hello\nworld\n\n"],
+                ["file2.txt", "hello\nworld2\n\n"]
+            ],
             "tests": [
                 {
                     "title":"name 1",

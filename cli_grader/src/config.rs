@@ -225,6 +225,8 @@ mod tests {
                     weight: Some(12),
                     tests: Tests::UnitTests(UnitTests {
                         env: vec![],
+                        inherit_parent_env: false,
+                        files: vec![("file 1".to_string(), "content 1".to_string())],
                         setup: vec![],
                         teardown: vec![],
                         tests: vec![UnitTest {

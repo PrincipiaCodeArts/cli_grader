@@ -182,15 +182,15 @@ impl UnitTestResult {
 /// setup/teardown procedures to be executed just before/after each test.
 ///
 /// # Fields
-/// - `inherited_parent_envs`: whether it will inherit the environment variables from
+/// - `inherit_parent_env`: whether it will inherit the environment variables from
 ///   parent process.
 /// - files: Vec of `(<filename>, <file_content>)`.
 /// - setup: Vec of (<command, Vec of args)
 /// - teardown: Vec of (<command, Vec of args)
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UnitTests {
-    envs: Vec<(String, String)>,
-    inherited_parent_envs: bool,
+    env: Vec<(String, String)>,
+    inherit_parent_env: bool,
     files: Vec<(String, String)>,
     setup: Vec<(String, Vec<String>)>,
     teardown: Vec<(String, Vec<String>)>,
@@ -199,20 +199,20 @@ pub struct UnitTests {
 
 impl UnitTests {
     pub fn new(
-        envs: Vec<(String, String)>,
-        inherited_parent_envs: bool,
+        env: Vec<(String, String)>,
+        inherit_parent_env: bool,
         files: Vec<(String, String)>,
         setup: Vec<(String, Vec<String>)>,
         teardown: Vec<(String, Vec<String>)>,
-        assertions_per_program: Vec<UnitTest>,
+        unit_tests: Vec<UnitTest>,
     ) -> Self {
         Self {
-            envs,
-            inherited_parent_envs,
+            env,
+            inherit_parent_env,
             files,
             setup,
             teardown,
-            unit_tests: assertions_per_program,
+            unit_tests,
         }
     }
 
@@ -221,8 +221,8 @@ impl UnitTests {
         for program_unit_assertion in self.unit_tests.iter() {
             let res = program_unit_assertion
                 .run(
-                    &self.envs,
-                    self.inherited_parent_envs,
+                    &self.env,
+                    self.inherit_parent_env,
                     &self.files,
                     &self.setup,
                     &self.teardown,
