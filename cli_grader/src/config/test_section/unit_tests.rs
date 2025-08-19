@@ -84,6 +84,7 @@ impl TableCellContent {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Table {
+    // TODO (remove_field): check if row_size is really necessary, and remove it, if not.
     pub row_size: usize,
     pub header: Vec<TableHeaderType>,
     pub tests: Vec<Vec<TableCellContent>>,
@@ -685,6 +686,259 @@ mod tests {
             ]"#,
             Table
         );
+
+        mod test_build_grading_assertion {
+            use super::*;
+
+            #[test]
+            #[should_panic]
+            fn should_panic_when_assertion_is_not_built_properly() {
+                let invalid_table = Table {
+                    row_size: 3,
+                    header: vec![
+                        TableHeaderType::Name,
+                        TableHeaderType::Stdin,
+                        TableHeaderType::Weight,
+                    ],
+                    tests: vec![
+                        vec![
+                            TableCellContent::String("name 1".to_string()),
+                            TableCellContent::String("stdin 1".to_string()),
+                            TableCellContent::Int(1),
+                        ],
+                        vec![
+                            TableCellContent::String("name 2".to_string()),
+                            TableCellContent::String("stdin 2".to_string()),
+                            TableCellContent::Int(2),
+                        ],
+                    ],
+                };
+                invalid_table.build_grading_assertions(1).unwrap();
+            }
+            #[test]
+            fn should_match_a_simple_table_test() {
+                let t = Table::build(
+                    vec![TableHeaderType::Name, TableHeaderType::Status],
+                    vec![vec![
+                        TableCellContent::String("test 1".to_string()),
+                        TableCellContent::Int(0),
+                    ]],
+                )
+                .unwrap();
+                assert_eq!(
+                    t.build_grading_assertions(1).unwrap(),
+                    vec![UnitTestAssertion::new(
+                        "test 1".to_string(),
+                        vec![],
+                        None,
+                        None,
+                        None,
+                        Some(0),
+                        1,
+                    )]
+                );
+            }
+            #[test]
+            fn should_match_args_correctly() {
+                let t = Table::build(
+                    vec![TableHeaderType::Args, TableHeaderType::Status],
+                    vec![
+                        vec![
+                            TableCellContent::String("arg1".to_string()),
+                            TableCellContent::Int(0),
+                        ],
+                        vec![
+                            TableCellContent::String("arg1    ".to_string()),
+                            TableCellContent::Int(0),
+                        ],
+                        vec![
+                            TableCellContent::String("\"arg1    \"".to_string()),
+                            TableCellContent::Int(0),
+                        ],
+                        vec![
+                            TableCellContent::String(
+                                "arg1 arg2\t\targ3  \"this is an arg\"    arg 5".to_string(),
+                            ),
+                            TableCellContent::Int(0),
+                        ],
+                    ],
+                )
+                .unwrap();
+                assert_eq!(
+                    t.build_grading_assertions(1).unwrap(),
+                    vec![
+                        UnitTestAssertion::new(
+                            "Assertion 1".to_string(),
+                            vec!["arg1".to_string()],
+                            None,
+                            None,
+                            None,
+                            Some(0),
+                            1,
+                        ),
+                        UnitTestAssertion::new(
+                            "Assertion 2".to_string(),
+                            vec!["arg1".to_string()],
+                            None,
+                            None,
+                            None,
+                            Some(0),
+                            1,
+                        ),
+                        UnitTestAssertion::new(
+                            "Assertion 3".to_string(),
+                            vec!["arg1    ".to_string()],
+                            None,
+                            None,
+                            None,
+                            Some(0),
+                            1,
+                        ),
+                        UnitTestAssertion::new(
+                            "Assertion 4".to_string(),
+                            vec![
+                                "arg1".to_string(),
+                                "arg2".to_string(),
+                                "arg3".to_string(),
+                                "this is an arg".to_string(),
+                                "arg".to_string(),
+                                "5".to_string(),
+                            ],
+                            None,
+                            None,
+                            None,
+                            Some(0),
+                            1,
+                        )
+                    ]
+                );
+            }
+
+            #[test]
+            fn should_match_a_complex_table_test() {
+                let t = Table::build(
+                    vec![
+                        TableHeaderType::Name,
+                        TableHeaderType::Status,
+                        TableHeaderType::Weight,
+                        TableHeaderType::Stdout,
+                    ],
+                    vec![
+                        vec![
+                            TableCellContent::String("test 1".to_string()),
+                            TableCellContent::Int(0),
+                            TableCellContent::Int(1),
+                            TableCellContent::String("stdout 1".to_string()),
+                        ],
+                        vec![
+                            TableCellContent::String("test 2".to_string()),
+                            TableCellContent::Int(0),
+                            TableCellContent::Int(2),
+                            TableCellContent::String("stdout 2".to_string()),
+                        ],
+                        vec![
+                            TableCellContent::String("test 3".to_string()),
+                            TableCellContent::Int(1),
+                            TableCellContent::Int(3),
+                            TableCellContent::String("".to_string()),
+                        ],
+                    ],
+                )
+                .unwrap();
+                assert_eq!(
+                    t.build_grading_assertions(1).unwrap(),
+                    vec![
+                        UnitTestAssertion::new(
+                            "test 1".to_string(),
+                            vec![],
+                            None,
+                            Some("stdout 1".to_string()),
+                            None,
+                            Some(0),
+                            1,
+                        ),
+                        UnitTestAssertion::new(
+                            "test 2".to_string(),
+                            vec![],
+                            None,
+                            Some("stdout 2".to_string()),
+                            None,
+                            Some(0),
+                            2,
+                        ),
+                        UnitTestAssertion::new(
+                            "test 3".to_string(),
+                            vec![],
+                            None,
+                            Some("".to_string()),
+                            None,
+                            Some(1),
+                            3,
+                        ),
+                    ]
+                );
+            }
+            #[test]
+            fn should_match_a_with_default_table_test_name() {
+                let t = Table::build(
+                    vec![
+                        TableHeaderType::Status,
+                        TableHeaderType::Weight,
+                        TableHeaderType::Stdout,
+                    ],
+                    vec![
+                        vec![
+                            TableCellContent::Int(0),
+                            TableCellContent::Int(1),
+                            TableCellContent::String("stdout 1".to_string()),
+                        ],
+                        vec![
+                            TableCellContent::Int(0),
+                            TableCellContent::Int(2),
+                            TableCellContent::String("stdout 2".to_string()),
+                        ],
+                        vec![
+                            TableCellContent::Int(1),
+                            TableCellContent::Int(3),
+                            TableCellContent::String("".to_string()),
+                        ],
+                    ],
+                )
+                .unwrap();
+                assert_eq!(
+                    t.build_grading_assertions(2).unwrap(),
+                    vec![
+                        UnitTestAssertion::new(
+                            "Assertion 2".to_string(),
+                            vec![],
+                            None,
+                            Some("stdout 1".to_string()),
+                            None,
+                            Some(0),
+                            1,
+                        ),
+                        UnitTestAssertion::new(
+                            "Assertion 3".to_string(),
+                            vec![],
+                            None,
+                            Some("stdout 2".to_string()),
+                            None,
+                            Some(0),
+                            2,
+                        ),
+                        UnitTestAssertion::new(
+                            "Assertion 4".to_string(),
+                            vec![],
+                            None,
+                            Some("".to_string()),
+                            None,
+                            Some(1),
+                            3,
+                        ),
+                    ]
+                );
+            }
+        }
     }
 
     mod test_detailed_test {
