@@ -110,6 +110,30 @@ impl Assertion {
             weight,
         }
     }
+
+    pub(crate) fn build(
+        name: String,
+        args: Vec<String>,
+        stdin: Option<String>,
+        stdout: Option<String>,
+        stderr: Option<String>,
+        status: Option<i32>,
+        weight: u32,
+    ) -> Result<Self, &'static str> {
+        if stdout.is_none() && stderr.is_none() && status.is_none() {
+            return Err("at least one expect field must be non-null (stdout, stderr, or status)");
+        }
+
+        Ok(Self {
+            name,
+            args,
+            stdin,
+            stdout,
+            stderr,
+            status,
+            weight,
+        })
+    }
     fn config_cmd(&self, cmd: &mut Command) {
         debug!("Configuring command '{:?}'", cmd.get_program());
         debug!("- Adding args: '{:?}'", self.args);

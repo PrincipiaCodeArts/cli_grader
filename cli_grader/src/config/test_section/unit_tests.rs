@@ -1,9 +1,19 @@
+use crate::{
+    grader::grading_tests::unit_test::{
+        assertion::Assertion as UnitTestAssertion, UnitTest as GradingUnitTest,
+    },
+    input::ExecutableArtifact,
+};
 use serde::{
     de::{self, Visitor},
     ser::SerializeSeq,
     Deserialize, Serialize,
 };
-use std::{collections::HashSet, iter};
+use shlex::Shlex;
+use std::{
+    collections::{HashMap, HashSet},
+    iter, panic,
+};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
@@ -50,6 +60,26 @@ impl TableHeaderType {
 pub enum TableCellContent {
     Int(i64),
     String(String),
+}
+impl TableCellContent {
+    fn extract_string(&self) -> String {
+        match self {
+            TableCellContent::String(s) => s.clone(),
+            _ => panic!("expected string"),
+        }
+    }
+    fn extract_u32(&self) -> u32 {
+        match self {
+            TableCellContent::Int(i) => *i as u32,
+            _ => panic!("expected u32"),
+        }
+    }
+    fn extract_i32(&self) -> i32 {
+        match self {
+            TableCellContent::Int(i) => *i as i32,
+            _ => panic!("expected i32"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -101,6 +131,51 @@ impl Table {
             tests,
         })
     }
+    fn build_grading_assertions(
+        &self,
+        mut n: usize,
+    ) -> Result<Vec<UnitTestAssertion>, &'static str> {
+        let mut assertions = vec![];
+        for t in &self.tests {
+            let mut name = format!("Assertion {n}");
+            n += 1;
+            let mut args = vec![];
+            let mut stdin: Option<String> = None;
+            let mut stdout: Option<String> = None;
+            let mut stderr: Option<String> = None;
+            let mut status: Option<i32> = None;
+            let mut weight: u32 = 1;
+            for (i, h) in self.header.iter().enumerate() {
+                match h {
+                    TableHeaderType::Name => name = t[i].extract_string(),
+                    TableHeaderType::Weight => weight = t[i].extract_u32(),
+                    TableHeaderType::Args => {
+                        let args_string = t[i].extract_string();
+                        let mut lex = Shlex::new(args_string.as_str());
+                        for arg in lex.by_ref() {
+                            args.push(arg);
+                        }
+                        if lex.had_error {
+                            return Err("invalid args string");
+                        }
+                    }
+                    TableHeaderType::Stdin => stdin = Some(t[i].extract_string()),
+                    TableHeaderType::Stdout => stdout = Some(t[i].extract_string()),
+                    TableHeaderType::Stderr => stderr = Some(t[i].extract_string()),
+                    TableHeaderType::Status => status = Some(t[i].extract_i32()),
+                }
+            }
+            if let Ok(assertion) =
+                UnitTestAssertion::build(name, args, stdin, stdout, stderr, status, weight)
+            {
+                assertions.push(assertion);
+                continue;
+            }
+            return Err("could not build assertion properly");
+        }
+        Ok(assertions)
+    }
+
     #[cfg(test)]
     fn new_dummy() -> Self {
         Self {
@@ -319,6 +394,31 @@ impl UnitTest {
             table,
             detailed_tests,
         })
+    }
+
+    fn build_grading_unit_test(
+        &self,
+        n: usize,
+        executables_by_name: &HashMap<String, ExecutableArtifact>,
+    ) -> Result<GradingUnitTest, &'static str> {
+        // try to get the executable
+        let default_name = format!("Unit Test {n}");
+        let default_program_name = "program1".to_string();
+        let executable =
+            executables_by_name.get(self.program_name.as_ref().unwrap_or(&default_program_name));
+        if executable.is_none() {
+            return Err("executable not found");
+        }
+        let unit_test = GradingUnitTest::new(
+            self.title.as_ref().unwrap_or(&default_name).clone(),
+            executable.unwrap().clone(),
+        );
+
+        // add assertions
+        todo!();
+        //unit_test.add_assertion(assertion);
+
+        Ok(unit_test)
     }
 
     #[cfg(test)]

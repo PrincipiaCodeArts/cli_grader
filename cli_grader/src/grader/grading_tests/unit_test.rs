@@ -1,7 +1,7 @@
 use crate::grader::grading_tests::unit_test::assertion::Assertion;
 use crate::grader::score::{GradingMode, Score};
 
-pub mod assertion;
+pub(crate) mod assertion;
 
 use crate::input::ExecutableArtifact;
 use assertion::AssertionResult;
@@ -29,7 +29,7 @@ impl UnitTest {
         self
     }
 
-    fn add_assertion(&mut self, assertion: Assertion) {
+    pub(crate) fn add_assertion(&mut self, assertion: Assertion) {
         self.assertions.push(assertion);
     }
 

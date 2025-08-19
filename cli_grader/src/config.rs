@@ -3,9 +3,11 @@ use crate::{
         grading_section::GradingSection, input_section::InputSection,
         report_section::ReportSection, test_section::TestSection,
     },
+    input::ExecutableArtifact,
     GradingConfig, LoggingMode,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 mod grading_section;
 mod input_section;
@@ -38,6 +40,9 @@ struct GlobalConfig {
     report: ReportSection,
     input: InputSection,
     sections: Vec<TestSection>,
+    // aux
+    #[serde(skip)]
+    executables_by_name: Option<HashMap<String, ExecutableArtifact>>,
 }
 
 impl GlobalConfig {
@@ -78,6 +83,7 @@ impl GlobalConfig {
             report,
             input,
             sections,
+            executables_by_name: None,
         })
     }
 
@@ -89,6 +95,10 @@ impl GlobalConfig {
         }
 
         c
+    }
+
+    fn set_executables_by_name(&self) -> Result<(), &'static str> {
+        Ok(())
     }
 }
 
@@ -245,6 +255,7 @@ mod tests {
                         }],
                     }),
                 }],
+                executables_by_name: None,
             },
             GlobalConfig
         );

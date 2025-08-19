@@ -1,4 +1,4 @@
-pub mod unit_test;
+pub(crate) mod unit_test;
 use crate::grader::grading_tests::unit_test::{UnitTests, UnitTestsResult};
 use crate::grader::score::{GradingMode, Score};
 
