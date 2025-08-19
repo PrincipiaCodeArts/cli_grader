@@ -1,10 +1,10 @@
 use crate::{
+    GradingConfig, LoggingMode,
     config::{
         grading_section::GradingSection, input_section::InputSection,
         report_section::ReportSection, test_section::TestSection,
     },
     input::ExecutableArtifact,
-    GradingConfig, LoggingMode,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

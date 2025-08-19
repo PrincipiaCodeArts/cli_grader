@@ -133,7 +133,7 @@ mod tests {
     mod grading_config_tests {
         use super::*;
         use crate::{
-            grader::grading_tests::unit_test::{assertion::Assertion, UnitTest, UnitTests},
+            grader::grading_tests::unit_test::{UnitTest, UnitTests, assertion::Assertion},
             input::ExecutableArtifact,
         };
         use std::vec;
@@ -244,7 +244,7 @@ mod tests {
         use super::*;
         use crate::{
             grader::grading_tests::unit_test::{
-                assertion::Assertion, UnitTest, UnitTestResult, UnitTests, UnitTestsResult,
+                UnitTest, UnitTestResult, UnitTests, UnitTestsResult, assertion::Assertion,
             },
             input::ExecutableArtifact,
         };
@@ -334,13 +334,15 @@ mod tests {
                                     current: 14,
                                     max: 14
                                 },
-                                vec![UnitTestResult::new(
-                                    program_unit_assertions_name,
-                                    target_program.name(),
-                                    GradingMode::Weighted
-                                )
-                                .with_assertion_result(expected_assertion1)
-                                .with_assertion_result(expected_assertion2)]
+                                vec![
+                                    UnitTestResult::new(
+                                        program_unit_assertions_name,
+                                        target_program.name(),
+                                        GradingMode::Weighted
+                                    )
+                                    .with_assertion_result(expected_assertion1)
+                                    .with_assertion_result(expected_assertion2)
+                                ]
                             )
                         )),
                     }]

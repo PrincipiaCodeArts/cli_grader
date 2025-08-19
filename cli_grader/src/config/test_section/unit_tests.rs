@@ -1,14 +1,14 @@
 use crate::{
     grader::grading_tests::unit_test::{
-        assertion::Assertion as UnitTestAssertion, UnitTest as GradingUnitTest,
-        UnitTests as GradingUnitTests,
+        UnitTest as GradingUnitTest, UnitTests as GradingUnitTests,
+        assertion::Assertion as UnitTestAssertion,
     },
     input::ExecutableArtifact,
 };
 use serde::{
+    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
-    Deserialize, Serialize,
 };
 use shlex::Shlex;
 use std::{
