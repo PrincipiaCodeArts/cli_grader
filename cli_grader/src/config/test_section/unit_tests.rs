@@ -468,7 +468,7 @@ impl UnitTest {
     fn new_dummy(n: u32) -> Self {
         Self {
             title: Some(format!("test {n}")),
-            program_name: Some(format!("program {n}")),
+            program_name: Some(format!("program{n}")),
             table: Some(Table::new_dummy()),
             detailed_tests: vec![],
         }
@@ -544,11 +544,47 @@ impl UnitTests {
         })
     }
 
-    /*
-    fn build_grading_unit_tests(&self) -> GradingUnitTests {
-        let r = GradingUnitTests::new(self.env, true, files, setup, teardown, unit_tests);
+    fn build_grading_unit_tests(
+        &self,
+        executables_by_name: &HashMap<String, ExecutableArtifact>,
+    ) -> Result<GradingUnitTests, &'static str> {
+        let mut unit_tests = vec![];
+
+        fn process_raw_string_commands(
+            commands: &[String],
+        ) -> Result<Vec<(String, Vec<String>)>, &'static str> {
+            let mut processed_commands = vec![];
+            for command in commands {
+                let mut lex = Shlex::new(command.as_str());
+                let command_name = match lex.next() {
+                    Some(c) => c,
+                    None => return Err("missing command"),
+                };
+                let mut processed_command = (command_name, vec![]);
+                for arg in lex.by_ref() {
+                    processed_command.1.push(arg);
+                }
+                if lex.had_error {
+                    return Err("invalid args string");
+                }
+                processed_commands.push(processed_command);
+            }
+            Ok(processed_commands)
+        }
+
+        // add unit tests
+        for (i, t) in self.tests.iter().enumerate() {
+            unit_tests.push(t.build_grading_unit_test(i + 1, executables_by_name)?);
+        }
+        Ok(GradingUnitTests::new(
+            self.env.clone(),
+            self.inherit_parent_env,
+            self.files.clone(),
+            process_raw_string_commands(&self.setup)?,
+            process_raw_string_commands(&self.teardown)?,
+            unit_tests,
+        ))
     }
-    */
 
     #[cfg(test)]
     pub fn new_dummy() -> Self {
@@ -1782,5 +1818,148 @@ mod tests {
         }"#,
             UnitTests
         );
+
+        mod test_build_grading_unit_tests {
+            use super::*;
+            use std::path::PathBuf;
+            #[test]
+            #[should_panic]
+            fn should_panic_when_there_is_invalid_command_in_setup() {
+                let r = UnitTests::build(
+                    vec![],
+                    true,
+                    vec![],
+                    vec![
+                        "valid command1".to_string(),
+                        "".to_string(),
+                        "command1 a b c".to_string(),
+                    ],
+                    vec![],
+                    vec![UnitTest::new_dummy(1), UnitTest::new_dummy(2)],
+                )
+                .unwrap();
+
+                let executable = ExecutableArtifact::CompiledProgram {
+                    name: "some name".to_string(),
+                    path: PathBuf::new(),
+                };
+                let executables_by_name = HashMap::from_iter([
+                    ("some program".to_string(), executable.clone()),
+                    ("program1".to_string(), executable.clone()),
+                    ("program2".to_string(), executable.clone()),
+                    ("p1".to_string(), executable.clone()),
+                ]);
+                r.build_grading_unit_tests(&executables_by_name).unwrap();
+            }
+
+            #[test]
+            #[should_panic]
+            fn should_panic_when_there_is_invalid_command_in_teardown() {
+                let r = UnitTests::build(
+                    vec![],
+                    false,
+                    vec![],
+                    vec![],
+                    vec![
+                        "valid command1".to_string(),
+                        "".to_string(),
+                        "command1 a b c".to_string(),
+                    ],
+                    vec![UnitTest::new_dummy(1), UnitTest::new_dummy(2)],
+                )
+                .unwrap();
+
+                let executable = ExecutableArtifact::CompiledProgram {
+                    name: "some name".to_string(),
+                    path: PathBuf::new(),
+                };
+                let executables_by_name = HashMap::from_iter([
+                    ("some program".to_string(), executable.clone()),
+                    ("program1".to_string(), executable.clone()),
+                    ("program2".to_string(), executable.clone()),
+                    ("p1".to_string(), executable.clone()),
+                ]);
+                r.build_grading_unit_tests(&executables_by_name).unwrap();
+            }
+
+            #[test]
+            fn should_correctly_build_unit_tests() {
+                let env = vec![
+                    ("k1".to_string(), "v1".to_string()),
+                    ("k2".to_string(), "v2".to_string()),
+                ];
+                let files = vec![("f1".to_string(), "v1".to_string())];
+                let u = UnitTests::build(
+                    env.clone(),
+                    false,
+                    files.clone(),
+                    vec![
+                        "command1 a b c \"hey there\"".to_string(),
+                        "command2 a b c".to_string(),
+                    ],
+                    vec!["cm1 a b c".to_string(), "cm2 a b c".to_string()],
+                    vec![
+                        UnitTest::new_dummy(1),
+                        UnitTest::new_dummy(2),
+                        UnitTest::new_dummy(1),
+                    ],
+                )
+                .unwrap();
+                let executable = ExecutableArtifact::CompiledProgram {
+                    name: "some name".to_string(),
+                    path: PathBuf::new(),
+                };
+                let executables_by_name = HashMap::from_iter([
+                    ("some program".to_string(), executable.clone()),
+                    ("program1".to_string(), executable.clone()),
+                    ("program2".to_string(), executable.clone()),
+                    ("p1".to_string(), executable.clone()),
+                ]);
+                assert_eq!(
+                    u.build_grading_unit_tests(&executables_by_name).unwrap(),
+                    GradingUnitTests::new(
+                        env,
+                        false,
+                        files,
+                        vec![
+                            (
+                                "command1".to_string(),
+                                vec![
+                                    "a".to_string(),
+                                    "b".to_string(),
+                                    "c".to_string(),
+                                    "hey there".to_string()
+                                ]
+                            ),
+                            (
+                                "command2".to_string(),
+                                vec!["a".to_string(), "b".to_string(), "c".to_string(),]
+                            )
+                        ],
+                        vec![
+                            (
+                                "cm1".to_string(),
+                                vec!["a".to_string(), "b".to_string(), "c".to_string(),]
+                            ),
+                            (
+                                "cm2".to_string(),
+                                vec!["a".to_string(), "b".to_string(), "c".to_string(),]
+                            )
+                        ],
+                        vec![
+                            UnitTest::new_dummy(1)
+                                .build_grading_unit_test(1, &executables_by_name)
+                                .unwrap(),
+                            UnitTest::new_dummy(2)
+                                .build_grading_unit_test(1, &executables_by_name)
+                                .unwrap(),
+                            UnitTest::new_dummy(1)
+                                .build_grading_unit_test(1, &executables_by_name)
+                                .unwrap(),
+                        ]
+                    )
+                );
+            }
+        }
     }
 }
