@@ -110,9 +110,10 @@ impl GlobalConfig<NotInitialized> {
         })
     }
 
-    /// Before using the configuration to actually build more useful artifacts for the
-    /// assessment of the input programs, it is necessary to initialize it. The
-    /// initialization process will make sure that the executables are configured properly.
+    /// It is necessary to initialize the `GlobalConfig` before using it further. It is
+    /// necessary to provide additional information about the executables, which is made
+    /// as the argument `program_name_to_path`, an array of tuples, mapping each program
+    /// name with its path provided by the user.
     fn initialize(
         self,
         program_name_to_path: &[(&str, PathBuf)],
