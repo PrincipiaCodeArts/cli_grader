@@ -1,4 +1,5 @@
 use crate::{
+    config::DEFAULT_MAIN_PROGRAM_NAME1,
     grader::grading_tests::unit_test::{
         UnitTest as GradingUnitTest, UnitTests as GradingUnitTests,
         assertion::Assertion as UnitTestAssertion,
@@ -437,8 +438,7 @@ impl UnitTest {
     ) -> Result<GradingUnitTest, &'static str> {
         // try to get the executable
         let default_name = format!("Unit Test {n}");
-        // TODO (move to a const)
-        let default_program_name = "program1".to_string();
+        let default_program_name = DEFAULT_MAIN_PROGRAM_NAME1.to_string();
         let executable =
             executables_by_name.get(self.program_name.as_ref().unwrap_or(&default_program_name));
         if executable.is_none() {

@@ -23,22 +23,24 @@ pub enum ExecutableArtifact {
     // JavascriptProgram
 }
 
-enum ProgramType {
+pub enum ProgramType {
     Compiled,
 }
 
 impl ExecutableArtifact {
-    /*
-    fn build(name: String, path: PathBuf, program_type: ProgramType) -> Result<Self, &'static str> {
+    pub fn build(
+        name: String,
+        path: PathBuf,
+        program_type: ProgramType,
+    ) -> Result<Self, &'static str> {
         match program_type {
             ProgramType::Compiled => {
                 // validate program
-                todo!();
-                //return Ok(ExecutableArtifact::CompiledProgram { name, path });
+                Ok(ExecutableArtifact::CompiledProgram { name, path })
             }
         }
     }
-    */
+
     pub fn new_cmd(&self) -> Command {
         match self {
             ExecutableArtifact::CompiledProgram { path, .. } => Command::new(path),

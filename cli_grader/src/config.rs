@@ -7,12 +7,17 @@ use crate::{
     input::ExecutableArtifact,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, marker, path::PathBuf};
 
 mod grading_section;
 mod input_section;
 mod report_section;
 mod test_section;
+
+const DEFAULT_MAIN_PROGRAM_NAME1: &str = "program1";
+const DEFAULT_MAIN_PROGRAM_NAME2: &str = "p1";
+const DEFAULT_PREFIX_PROGRAM_NAME1: &str = "program";
+const DEFAULT_PREFIX_PROGRAM_NAME2: &str = "p";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -30,9 +35,14 @@ struct GlobalConfigUnchecked {
     sections: Vec<TestSection>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(try_from = "GlobalConfigUnchecked")]
-struct GlobalConfig {
+#[derive(Debug, PartialEq)]
+struct NotInitialized;
+
+#[derive(Debug, PartialEq)]
+struct Initialized;
+
+#[derive(Serialize, Debug, PartialEq)]
+struct GlobalConfig<State = NotInitialized> {
     title: String,
     author: Option<String>,
     logging_mode: LoggingMode,
@@ -41,11 +51,25 @@ struct GlobalConfig {
     input: InputSection,
     sections: Vec<TestSection>,
     // aux
+    /// In order to initialize this field, it is necessary to run `set_executables` at least
+    /// once. Each subsequent call to that method will update this field.
     #[serde(skip)]
     executables_by_name: Option<HashMap<String, ExecutableArtifact>>,
+    #[serde(skip)]
+    _state: marker::PhantomData<State>,
 }
 
-impl GlobalConfig {
+impl<'de> Deserialize<'de> for GlobalConfig<NotInitialized> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        GlobalConfigUnchecked::deserialize(deserializer)
+            .and_then(|v| GlobalConfig::try_from(v).map_err(serde::de::Error::custom))
+    }
+}
+
+impl GlobalConfig<NotInitialized> {
     fn build(
         title: String,
         author: Option<String>,
@@ -59,14 +83,12 @@ impl GlobalConfig {
             return Err("at least one test section is expected");
         }
 
-        let available_program_names = input.available_program_names().map_err(|_| "Invalid alias: duplicated name. Aliases should not have the form \"p<number>\" or \"program<number>\" nor be duplicated with other aliases")?;
-
         for s in &sections {
             match &s.tests {
                 test_section::Tests::UnitTests(unit_tests) => {
                     for t in &unit_tests.tests {
                         if let Some(name) = &t.program_name
-                            && !available_program_names.contains(name)
+                            && !input.contains_program_name(name)
                         {
                             return Err("program name out of scope");
                         }
@@ -84,9 +106,69 @@ impl GlobalConfig {
             input,
             sections,
             executables_by_name: None,
+            _state: marker::PhantomData,
         })
     }
 
+    /// Before using the configuration to actually build more useful artifacts for the
+    /// assessment of the input programs, it is necessary to initialize it. The
+    /// initialization process will make sure that the executables are configured properly.
+    fn initialize(
+        self,
+        program_name_to_path: &[(&str, PathBuf)],
+    ) -> Result<GlobalConfig<Initialized>, Box<(GlobalConfig<NotInitialized>, &'static str)>> {
+        if self.input.input_programs_size() != program_name_to_path.len() {
+            return Err(Box::new((
+                self,
+                "there is a different number of program names between config and user's program_name_to_path map",
+            )));
+        }
+        let mut index_mapped = vec![false; program_name_to_path.len()];
+
+        let mut executables_by_index = HashMap::with_capacity(program_name_to_path.len());
+        for (program_name, path) in program_name_to_path {
+            if !self.input.contains_program_name(program_name) {
+                return Err(Box::new((self, "user program name not found in namespace")));
+            }
+            let program_index = self.input.get_program_index_unchecked(program_name);
+            if index_mapped[program_index] {
+                return Err(Box::new((self, "user program name duplicated")));
+            }
+            index_mapped[program_index] = true;
+
+            let program_type = self.input.get_program_type_unchecked(program_name);
+
+            let executable_artifact = match ExecutableArtifact::build(
+                program_name.to_string(),
+                path.clone(),
+                program_type.into(),
+            ) {
+                Ok(e) => e,
+                Err(err) => return Err(Box::new((self, err))),
+            };
+            executables_by_index.insert(program_index, executable_artifact);
+        }
+        let mut executables_by_name = HashMap::with_capacity(program_name_to_path.len() * 2);
+        for (program_name, index) in self.input.get_program_name_by_index() {
+            let executable_artifact = &executables_by_index[index];
+            executables_by_name.insert(program_name.clone(), executable_artifact.clone());
+        }
+
+        Ok(GlobalConfig {
+            title: self.title,
+            author: self.author,
+            logging_mode: self.logging_mode,
+            grading: self.grading,
+            report: self.report,
+            input: self.input,
+            sections: self.sections,
+            executables_by_name: Some(executables_by_name),
+            _state: marker::PhantomData,
+        })
+    }
+}
+
+impl GlobalConfig<Initialized> {
     fn build_grading_config(&self) -> Result<GradingConfig, &'static str> {
         let mut c = GradingConfig::new(self.title.clone(), self.author.clone(), self.grading.mode);
 
@@ -101,14 +183,9 @@ impl GlobalConfig {
 
         Ok(c)
     }
-
-    // TODO (checkpoint)
-    fn set_executables_by_name(&self) -> Result<(), &'static str> {
-        todo!()
-    }
 }
 
-impl TryFrom<GlobalConfigUnchecked> for GlobalConfig {
+impl TryFrom<GlobalConfigUnchecked> for GlobalConfig<NotInitialized> {
     type Error = &'static str;
 
     fn try_from(value: GlobalConfigUnchecked) -> Result<Self, Self::Error> {
@@ -215,6 +292,7 @@ mod tests {
         test_serialize_and_deserialize!(
             should_serialize_and_deserialize,
             GlobalConfig {
+                _state: marker::PhantomData::<NotInitialized>,
                 title: "configuration 1".to_string(),
                 author: None,
                 logging_mode: LoggingMode::Silent,
@@ -808,34 +886,234 @@ mod tests {
             GlobalConfig
         );
 
-        mod test_build_grader_config {
+        mod test_initialize {
             use super::*;
+            use crate::config::input_section::{InputType, ProgramSpecification};
 
             #[test]
             #[should_panic]
-            fn should_panic_whit_uninitialized_executables_by_name() {
-                let c = GlobalConfig {
-                    title: "test 1".to_string(),
-                    author: None,
-                    logging_mode: LoggingMode::Silent,
-                    grading: GradingSection {
-                        mode: GradingMode::Absolute,
+            fn should_panic_for_number_of_input_programs_greater_than_config() {
+                let c = GlobalConfig::build(
+                    "test 1".to_string(),
+                    None,
+                    LoggingMode::Verbose,
+                    GradingSection {
+                        mode: GradingMode::Weighted,
                     },
-                    report: ReportSection {
+                    ReportSection {
                         is_verbose: false,
                         output: ReportOutput::Txt,
                     },
-                    input: InputSection::default(),
-                    sections: vec![
-                        TestSection::new_dummy(1),
-                        TestSection::new_dummy(2),
-                        TestSection::new_dummy(1),
-                    ],
-                    executables_by_name: None,
-                };
-
-                c.build_grading_config().unwrap();
+                    InputSection::build(vec![
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                    ])
+                    .unwrap(),
+                    vec![TestSection::new_dummy(1)],
+                )
+                .unwrap();
+                // TODO (refactor error handling): when error handling is refactored, this
+                // test will check for specific test instead of only checking for panicking.
+                c.initialize(&[
+                    ("program3", PathBuf::from("p2")),
+                    ("p1", PathBuf::from("p1")),
+                    ("program2", PathBuf::from("p2")),
+                    ("p4", PathBuf::from("p1")),
+                ])
+                .unwrap();
             }
+
+            #[test]
+            #[should_panic]
+            fn should_panic_for_number_of_input_programs_less_than_config() {
+                let c = GlobalConfig::build(
+                    "test 1".to_string(),
+                    None,
+                    LoggingMode::Verbose,
+                    GradingSection {
+                        mode: GradingMode::Weighted,
+                    },
+                    ReportSection {
+                        is_verbose: false,
+                        output: ReportOutput::Txt,
+                    },
+                    InputSection::build(vec![
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                    ])
+                    .unwrap(),
+                    vec![TestSection::new_dummy(1)],
+                )
+                .unwrap();
+                // TODO (refactor error handling): when error handling is refactored, this
+                // test will check for specific test instead of only checking for panicking.
+                c.initialize(&[
+                    ("p1", PathBuf::from("p1")),
+                    ("program2", PathBuf::from("p2")),
+                ])
+                .unwrap();
+            }
+
+            #[test]
+            #[should_panic]
+            fn should_panic_for_invalid_input_name() {
+                let c = GlobalConfig::build(
+                    "test 1".to_string(),
+                    None,
+                    LoggingMode::Verbose,
+                    GradingSection {
+                        mode: GradingMode::Weighted,
+                    },
+                    ReportSection {
+                        is_verbose: false,
+                        output: ReportOutput::Txt,
+                    },
+                    InputSection::build(vec![
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                    ])
+                    .unwrap(),
+                    vec![TestSection::new_dummy(1)],
+                )
+                .unwrap();
+                // TODO (refactor error handling): when error handling is refactored, this
+                // test will check for specific test instead of only checking for panicking.
+                c.initialize(&[
+                    ("p1", PathBuf::from("p1")),
+                    ("program2", PathBuf::from("p2")),
+                    ("invalid name", PathBuf::from("p2")),
+                ])
+                .unwrap();
+            }
+
+            #[test]
+            #[should_panic]
+            fn should_panic_for_duplicated_input_name() {
+                let c = GlobalConfig::build(
+                    "test 1".to_string(),
+                    None,
+                    LoggingMode::Verbose,
+                    GradingSection {
+                        mode: GradingMode::Weighted,
+                    },
+                    ReportSection {
+                        is_verbose: false,
+                        output: ReportOutput::Txt,
+                    },
+                    InputSection::build(vec![
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                    ])
+                    .unwrap(),
+                    vec![TestSection::new_dummy(1)],
+                )
+                .unwrap();
+                // TODO (refactor error handling): when error handling is refactored, this
+                // test will check for specific test instead of only checking for panicking.
+                c.initialize(&[
+                    ("p1", PathBuf::from("p1")),
+                    ("program2", PathBuf::from("p2")),
+                    ("p2", PathBuf::from("p2 abc")),
+                ])
+                .unwrap();
+            }
+            #[test]
+            #[should_panic]
+            fn should_panic_with_duplicated_alias() {
+                let c = GlobalConfig::build(
+                    "test 1".to_string(),
+                    None,
+                    LoggingMode::Verbose,
+                    GradingSection {
+                        mode: GradingMode::Weighted,
+                    },
+                    ReportSection {
+                        is_verbose: false,
+                        output: ReportOutput::Txt,
+                    },
+                    InputSection::build(vec![
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::Complete {
+                            alias: "java".to_string(),
+                            program_type: InputType::CompiledProgram,
+                        },
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::Complete {
+                            alias: "rust".to_string(),
+                            program_type: InputType::CompiledProgram,
+                        },
+                        ProgramSpecification::Complete {
+                            alias: "python".to_string(),
+                            program_type: InputType::CompiledProgram,
+                        },
+                    ])
+                    .unwrap(),
+                    vec![TestSection::new_dummy(1)],
+                )
+                .unwrap();
+                // TODO (refactor error handling): when error handling is refactored, this
+                // test will check for specific test instead of only checking for panicking.
+                c.initialize(&[
+                    ("p1", PathBuf::from("p1")),
+                    ("java", PathBuf::from("p3")),
+                    ("java", PathBuf::from("p.java")),
+                    ("python", PathBuf::from("p.py")),
+                    ("rust", PathBuf::from("p.rs")),
+                ])
+                .unwrap();
+            }
+
+            #[test]
+            fn should_initialize_properly() {
+                let c = GlobalConfig::build(
+                    "test 1".to_string(),
+                    None,
+                    LoggingMode::Verbose,
+                    GradingSection {
+                        mode: GradingMode::Weighted,
+                    },
+                    ReportSection {
+                        is_verbose: false,
+                        output: ReportOutput::Txt,
+                    },
+                    InputSection::build(vec![
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::Complete {
+                            alias: "java".to_string(),
+                            program_type: InputType::CompiledProgram,
+                        },
+                        ProgramSpecification::OnlyType(InputType::CompiledProgram),
+                        ProgramSpecification::Complete {
+                            alias: "rust".to_string(),
+                            program_type: InputType::CompiledProgram,
+                        },
+                        ProgramSpecification::Complete {
+                            alias: "python".to_string(),
+                            program_type: InputType::CompiledProgram,
+                        },
+                    ])
+                    .unwrap(),
+                    vec![TestSection::new_dummy(1)],
+                )
+                .unwrap();
+                // TODO (refactor error handling): when error handling is refactored, this
+                // test will check for specific test instead of only checking for panicking.
+                c.initialize(&[
+                    ("p1", PathBuf::from("p1")),
+                    ("program3", PathBuf::from("p3")),
+                    ("java", PathBuf::from("p.java")),
+                    ("python", PathBuf::from("p.py")),
+                    ("rust", PathBuf::from("p.rs")),
+                ])
+                .unwrap();
+            }
+        }
+        mod test_build_grader_config {
+            use super::*;
 
             #[test]
             fn should_build_grading_config_properly() {
@@ -863,6 +1141,7 @@ mod tests {
                         TestSection::new_dummy(1),
                     ],
                     executables_by_name: Some(executables_by_name.clone()),
+                    _state: marker::PhantomData::<Initialized>,
                 };
 
                 let mut expected =
