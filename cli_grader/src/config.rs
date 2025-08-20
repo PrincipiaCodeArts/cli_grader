@@ -1,10 +1,10 @@
 use crate::{
-    GradingConfig, LoggingMode,
     config::{
         grading_section::GradingSection, input_section::InputSection,
         report_section::ReportSection, test_section::TestSection,
     },
     input::ExecutableArtifact,
+    GradingConfig, LoggingMode,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, marker, path::PathBuf};
@@ -51,8 +51,8 @@ struct GlobalConfig<State = NotInitialized> {
     input: InputSection,
     sections: Vec<TestSection>,
     // aux
-    /// In order to initialize this field, it is necessary to run `set_executables` at least
-    /// once. Each subsequent call to that method will update this field.
+    /// In order to initialize this field, it is necessary to run `initialize` at least
+    /// once.
     #[serde(skip)]
     executables_by_name: Option<HashMap<String, ExecutableArtifact>>,
     #[serde(skip)]
