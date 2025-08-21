@@ -51,12 +51,12 @@ impl AssertionResult {
     fn new(name: String, weight: u32) -> Self {
         Self {
             name,
-            weight,
             passed: false,
             execution_status: ExecutionStatus::Undefined,
             stdout_diagnostics: None,
             stderr_diagnostics: None,
             status_diagnostics: None,
+            weight,
         }
     }
 
@@ -91,16 +91,23 @@ impl AssertionResult {
 }
 
 impl Assertion {
-    pub fn new(
+    pub fn build(
         name: String,
+        // input
         args: Vec<String>,
         stdin: Option<String>,
+        // expect
         stdout: Option<String>,
         stderr: Option<String>,
         status: Option<i32>,
+        // grading
         weight: u32,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, &'static str> {
+        if stdout.is_none() && stderr.is_none() && status.is_none() {
+            return Err("at least one expect field must be non-null (stdout, stderr, or status)");
+        }
+
+        Ok(Self {
             name,
             args,
             stdin,
@@ -108,7 +115,7 @@ impl Assertion {
             stderr,
             status,
             weight,
-        }
+        })
     }
     fn config_cmd(&self, cmd: &mut Command) {
         debug!("Configuring command '{:?}'", cmd.get_program());
@@ -205,28 +212,28 @@ impl Assertion {
 
         let mut passed = true;
         if output.status.success() {
-            if let Some(expected_status) = self.status {
-                if expected_status != 0 {
-                    debug!("  ❌ Failed status assertion.");
-                    debug!("   -📋 Expected: {expected_status}");
-                    debug!("   -📊 Obtained: 0 (success)");
-                    passed = false;
-                    assertion_result.set_status_diagnostics(expected_status, Some(0));
-                }
+            if let Some(expected_status) = self.status
+                && expected_status != 0
+            {
+                debug!("  ❌ Failed status assertion.");
+                debug!("   -📋 Expected: {expected_status}");
+                debug!("   -📊 Obtained: 0 (success)");
+                passed = false;
+                assertion_result.set_status_diagnostics(expected_status, Some(0));
             }
             assertion_result.set_execution_status(ExecutionStatus::Success);
         } else {
             match output.status.code() {
                 Some(obtained_status) => {
-                    if let Some(expected_status) = self.status {
-                        if expected_status != obtained_status {
-                            debug!("  ❌ Failed status assertion.");
-                            debug!("   -📋 Expected: {expected_status}");
-                            debug!("   -📊 Obtained: {obtained_status}");
-                            passed = false;
-                            assertion_result
-                                .set_status_diagnostics(expected_status, Some(obtained_status));
-                        }
+                    if let Some(expected_status) = self.status
+                        && expected_status != obtained_status
+                    {
+                        debug!("  ❌ Failed status assertion.");
+                        debug!("   -📋 Expected: {expected_status}");
+                        debug!("   -📊 Obtained: {obtained_status}");
+                        passed = false;
+                        assertion_result
+                            .set_status_diagnostics(expected_status, Some(obtained_status));
                     }
                     assertion_result
                         .set_execution_status(ExecutionStatus::FailureWithStatus(obtained_status))
@@ -245,41 +252,41 @@ impl Assertion {
             }
         }
 
-        if let Some(ref expected_stdout) = self.stdout {
-            if output.stdout != expected_stdout.as_bytes() {
-                debug!("  ❌ Failed stdout assertion.");
-                debug!(
-                    "   -📋 Expected: '{}'",
-                    expected_stdout.replace('\n', "\\n")
-                );
-                debug!(
-                    "   -📊 Obtained: '{}'",
-                    String::from_utf8_lossy(&output.stdout).replace('\n', "\\n")
-                );
-                passed = false;
-                assertion_result.set_stdout_diagnostics(
-                    expected_stdout.clone(),
-                    Some(String::from_utf8_lossy(&output.stdout).into_owned()),
-                );
-            }
+        if let Some(ref expected_stdout) = self.stdout
+            && output.stdout != expected_stdout.as_bytes()
+        {
+            debug!("  ❌ Failed stdout assertion.");
+            debug!(
+                "   -📋 Expected: '{}'",
+                expected_stdout.replace('\n', "\\n")
+            );
+            debug!(
+                "   -📊 Obtained: '{}'",
+                String::from_utf8_lossy(&output.stdout).replace('\n', "\\n")
+            );
+            passed = false;
+            assertion_result.set_stdout_diagnostics(
+                expected_stdout.clone(),
+                Some(String::from_utf8_lossy(&output.stdout).into_owned()),
+            );
         }
-        if let Some(ref expected_stderr) = self.stderr {
-            if output.stderr != expected_stderr.as_bytes() {
-                debug!("  ❌ Failed stderr assertion.");
-                debug!(
-                    "   -📋 Expected: '{}'",
-                    expected_stderr.replace('\n', "\\n")
-                );
-                debug!(
-                    "   -📊 Obtained: '{}'",
-                    String::from_utf8_lossy(&output.stderr).replace('\n', "\\n")
-                );
-                passed = false;
-                assertion_result.set_stderr_diagnostics(
-                    expected_stderr.clone(),
-                    Some(String::from_utf8_lossy(&output.stderr).into_owned()),
-                );
-            }
+        if let Some(ref expected_stderr) = self.stderr
+            && output.stderr != expected_stderr.as_bytes()
+        {
+            debug!("  ❌ Failed stderr assertion.");
+            debug!(
+                "   -📋 Expected: '{}'",
+                expected_stderr.replace('\n', "\\n")
+            );
+            debug!(
+                "   -📊 Obtained: '{}'",
+                String::from_utf8_lossy(&output.stderr).replace('\n', "\\n")
+            );
+            passed = false;
+            assertion_result.set_stderr_diagnostics(
+                expected_stderr.clone(),
+                Some(String::from_utf8_lossy(&output.stderr).into_owned()),
+            );
         }
 
         assertion_result.set_passed(passed);
@@ -385,7 +392,7 @@ impl Assertion {
         status: Option<i32>,
         weight: u32,
     ) -> Self {
-        Self::new(
+        Self::build(
             format!("name {id}"),
             (0..4)
                 .into_iter()
@@ -409,6 +416,7 @@ impl Assertion {
             status,
             weight,
         )
+        .unwrap()
     }
 }
 
@@ -427,7 +435,7 @@ mod tests {
             let expected_status = Some(0);
             let assertion_name = "name 123".to_string();
             let assertion_weight = 1;
-            let not_passed_assertion = Assertion::new(
+            let not_passed_assertion = Assertion::build(
                 assertion_name.clone(),
                 args,
                 Some("stdin 1".to_string()),
@@ -435,7 +443,8 @@ mod tests {
                 expected_stderr.clone(),
                 expected_status,
                 assertion_weight,
-            );
+            )
+            .unwrap();
 
             let mut cmd = Command::new("____invalid_command");
 
@@ -488,7 +497,7 @@ mod tests {
 
             let assertion_name = "assertion name".to_string();
             let assertion_weight = 3;
-            let passed_assertion = Assertion::new(
+            let passed_assertion = Assertion::build(
                 assertion_name.clone(),
                 args.clone(),
                 None,
@@ -496,7 +505,8 @@ mod tests {
                 passing_expected_stderr.clone(),
                 passing_expected_status,
                 assertion_weight,
-            );
+            )
+            .unwrap();
 
             let cmd = Command::new("echo");
 
@@ -519,7 +529,7 @@ mod tests {
             let not_passing_expected_stderr = Some("invalid error".to_string());
             let not_passing_expected_status = Some(23);
 
-            let not_passed_assertion = Assertion::new(
+            let not_passed_assertion = Assertion::build(
                 assertion_name.clone(),
                 args,
                 None,
@@ -527,7 +537,8 @@ mod tests {
                 not_passing_expected_stderr.clone(),
                 not_passing_expected_status,
                 assertion_weight,
-            );
+            )
+            .unwrap();
 
             let cmd = Command::new("echo");
 
@@ -565,7 +576,7 @@ mod tests {
 
             let assertion_name = "assertion name".to_string();
             let assertion_weight = 8;
-            let passed_assertion = Assertion::new(
+            let passed_assertion = Assertion::build(
                 assertion_name.clone(),
                 vec![],
                 stdin.clone(),
@@ -573,7 +584,8 @@ mod tests {
                 passing_expected_stderr.clone(),
                 passing_expected_status,
                 assertion_weight,
-            );
+            )
+            .unwrap();
 
             let cmd = Command::new("cat");
 
@@ -597,7 +609,7 @@ mod tests {
             let not_passing_expected_stdout =
                 Some("this is the input   !\n and this also".to_string());
 
-            let not_passed_assertion = Assertion::new(
+            let not_passed_assertion = Assertion::build(
                 assertion_name.clone(),
                 vec![],
                 stdin.clone(),
@@ -605,7 +617,8 @@ mod tests {
                 passing_expected_stderr.clone(),
                 passing_expected_status,
                 assertion_weight,
-            );
+            )
+            .unwrap();
 
             let cmd = Command::new("cat");
 

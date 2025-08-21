@@ -1,20 +1,22 @@
-use crate::grader::assessment_modalities::unit_test::assertion::Assertion;
-use crate::grader::score::{Mode, Score};
+use crate::grader::grading_tests::unit_test::assertion::Assertion;
+use crate::grader::score::{GradingMode, Score};
 
-pub mod assertion;
+pub(crate) mod assertion;
 
-use crate::grader::executable::ExecutableArtifact;
+use crate::input::ExecutableArtifact;
 use assertion::AssertionResult;
 use std::{fs, io, process};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AssertionsPerExecutable {
+pub struct UnitTest {
     name: String, // Default: `Unit testing <TargetProgram>`
+    // TODO does it make sense to allow multiple executables to be tested under the same set
+    // of assertions?
     executable: ExecutableArtifact,
     assertions: Vec<Assertion>,
 }
 
-impl AssertionsPerExecutable {
+impl UnitTest {
     pub fn new(name: String, executable: ExecutableArtifact) -> Self {
         Self {
             name,
@@ -22,13 +24,37 @@ impl AssertionsPerExecutable {
             assertions: vec![],
         }
     }
+
+    #[cfg(test)]
+    pub fn new_dummy(
+        name: String,
+        executable: ExecutableArtifact,
+        assertions: Vec<Assertion>,
+    ) -> Self {
+        Self {
+            name,
+            executable,
+            assertions,
+        }
+    }
+
+    #[cfg(test)]
     pub fn with_assertion(mut self, assertion: Assertion) -> Self {
         self.assertions.push(assertion);
         self
     }
 
-    fn add_assertion(&mut self, assertion: Assertion) {
+    pub fn add_assertion(&mut self, assertion: Assertion) {
         self.assertions.push(assertion);
+    }
+
+    pub fn add_assertions(&mut self, assertions: Vec<Assertion>) {
+        self.assertions.extend(assertions);
+    }
+
+    /// Get the number of assertions.
+    pub fn size(&self) -> usize {
+        self.assertions.len()
     }
 
     fn run(
@@ -38,13 +64,10 @@ impl AssertionsPerExecutable {
         files: &[(String, String)],
         setup: &[(String, Vec<String>)],
         teardown: &[(String, Vec<String>)],
-        grading_mode: Mode,
-    ) -> io::Result<AssertionsPerExecutableResult> {
-        let mut result = AssertionsPerExecutableResult::new(
-            self.name.clone(),
-            self.executable.name(),
-            grading_mode,
-        );
+        grading_mode: GradingMode,
+    ) -> io::Result<UnitTestResult> {
+        let mut result =
+            UnitTestResult::new(self.name.clone(), self.executable.name(), grading_mode);
         for assertion in self.assertions.iter() {
             let tmp_dir = match tempfile::tempdir() {
                 Ok(dir) => dir,
@@ -112,15 +135,15 @@ impl AssertionsPerExecutable {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AssertionsPerExecutableResult {
+pub struct UnitTestResult {
     name: String,
     executable_name: String,
     score: Score,
     assertion_results: Vec<AssertionResult>,
 }
 
-impl AssertionsPerExecutableResult {
-    pub fn new(name: String, executable_name: String, grading_mode: Mode) -> Self {
+impl UnitTestResult {
+    pub fn new(name: String, executable_name: String, grading_mode: GradingMode) -> Self {
         Self {
             name,
             executable_name,
@@ -148,54 +171,59 @@ impl AssertionsPerExecutableResult {
     }
 }
 
-/// Each unit test will be the execution of an executable artifact along with some
+type Key = String;
+type Value = String;
+type Command = String;
+type Arg = String;
+type FileContent = String;
+/// Set of `UnitTest`s.
+///
+/// Each `UnitTest` will be the execution of an executable artifact along with some
 /// assertions. It will generate a result with the details of the process.
 ///
-/// For each set of unit tests, it is possible to set the environment variables, files, and
+/// For each set of unit tests, it is possible to specify the environment variables, files, and
 /// setup/teardown procedures to be executed just before/after each test.
 ///
 /// # Fields
-/// - `inherited_parent_envs`: whether it will inherith the environment variables from
+/// - `inherit_parent_env`: whether it will inherit the environment variables from
 ///   parent process.
-/// - files: Vec of `(<filename>, <file_content>)`.
-/// - setup: Vec of (<command, Vec of args)
-/// - teardown: Vec of (<command, Vec of args)
+/// - `files`: Vec of `(<filename>, <file_content>)`.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct UnitTest {
-    envs: Vec<(String, String)>,
-    inherited_parent_envs: bool,
-    files: Vec<(String, String)>,
-    setup: Vec<(String, Vec<String>)>,
-    teardown: Vec<(String, Vec<String>)>,
-    assertions_per_program: Vec<AssertionsPerExecutable>,
+pub struct UnitTests {
+    env: Vec<(Key, Value)>,
+    inherit_parent_env: bool,
+    files: Vec<(String, FileContent)>,
+    setup: Vec<(Command, Vec<Arg>)>,
+    teardown: Vec<(Command, Vec<Arg>)>,
+    unit_tests: Vec<UnitTest>,
 }
 
-impl UnitTest {
+impl UnitTests {
     pub fn new(
-        envs: Vec<(String, String)>,
-        inherited_parent_envs: bool,
+        env: Vec<(String, String)>,
+        inherit_parent_env: bool,
         files: Vec<(String, String)>,
         setup: Vec<(String, Vec<String>)>,
         teardown: Vec<(String, Vec<String>)>,
-        assertions_per_program: Vec<AssertionsPerExecutable>,
+        unit_tests: Vec<UnitTest>,
     ) -> Self {
         Self {
-            envs,
-            inherited_parent_envs,
+            env,
+            inherit_parent_env,
             files,
             setup,
             teardown,
-            assertions_per_program,
+            unit_tests,
         }
     }
 
-    pub fn run(&self, grading_mode: Mode) -> UnitTestResult {
-        let mut result = UnitTestResult::new(grading_mode);
-        for program_unit_assertion in self.assertions_per_program.iter() {
+    pub fn run(&self, grading_mode: GradingMode) -> UnitTestsResult {
+        let mut result = UnitTestsResult::new(grading_mode);
+        for program_unit_assertion in self.unit_tests.iter() {
             let res = program_unit_assertion
                 .run(
-                    &self.envs,
-                    self.inherited_parent_envs,
+                    &self.env,
+                    self.inherit_parent_env,
                     &self.files,
                     &self.setup,
                     &self.teardown,
@@ -213,13 +241,13 @@ impl UnitTest {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct UnitTestResult {
+pub struct UnitTestsResult {
     score: Score,
-    assertions_per_executable_results: Vec<AssertionsPerExecutableResult>,
+    assertions_per_executable_results: Vec<UnitTestResult>,
 }
 
-impl UnitTestResult {
-    fn new(grading_mode: Mode) -> Self {
+impl UnitTestsResult {
+    fn new(grading_mode: GradingMode) -> Self {
         Self {
             score: Score::default(grading_mode),
             assertions_per_executable_results: vec![],
@@ -227,17 +255,14 @@ impl UnitTestResult {
     }
 
     #[cfg(test)]
-    pub fn new_with(
-        score: Score,
-        assertions_per_program_results: Vec<AssertionsPerExecutableResult>,
-    ) -> Self {
+    pub fn new_with(score: Score, assertions_per_program_results: Vec<UnitTestResult>) -> Self {
         Self {
             score,
             assertions_per_executable_results: assertions_per_program_results,
         }
     }
 
-    fn add_result(&mut self, result: AssertionsPerExecutableResult) {
+    fn add_result(&mut self, result: UnitTestResult) {
         self.score += result.score;
         self.assertions_per_executable_results.push(result);
     }

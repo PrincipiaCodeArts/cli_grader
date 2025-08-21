@@ -1,11 +1,14 @@
+use serde::{Deserialize, Serialize};
 use std::ops::{AddAssign, Mul};
 
 /// The way that the score will be calculated.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Mode {
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum GradingMode {
     /// Score will be binary (0 or 1, true or false).
     Absolute,
     /// Score will range from 0 to the total of weight.
+    #[default]
     Weighted,
 }
 
@@ -18,10 +21,10 @@ pub enum Score {
 
 impl Score {
     /// Creates a default version for `Score` which represents the 0 in the chosen mode.
-    pub fn default(grading_mode: Mode) -> Self {
+    pub fn default(grading_mode: GradingMode) -> Self {
         match grading_mode {
-            Mode::Absolute => Self::Absolute(false),
-            Mode::Weighted => Self::Weighted { current: 0, max: 0 },
+            GradingMode::Absolute => Self::Absolute(false),
+            GradingMode::Weighted => Self::Weighted { current: 0, max: 0 },
         }
     }
 }
@@ -101,7 +104,7 @@ mod tests {
         #[test]
         #[should_panic]
         fn should_panic_when_adding_incompatible_modes() {
-            let mut score = Score::default(Mode::Weighted);
+            let mut score = Score::default(GradingMode::Weighted);
             score += Score::Absolute(true);
         }
 
