@@ -171,7 +171,11 @@ impl GlobalConfig<NotInitialized> {
 
 impl GlobalConfig<Initialized> {
     fn build_grading_config(&self) -> Result<GradingConfig, &'static str> {
-        let mut c = GradingConfig::new(self.title.clone(), self.author.clone(), self.grading.mode);
+        let mut c = GradingConfig::new(
+            self.title.clone(),
+            self.author.clone(),
+            self.grading.get_grading_mode(),
+        );
 
         let executables_by_name = self
             .executables_by_name
@@ -297,13 +301,8 @@ mod tests {
                 title: "configuration 1".to_string(),
                 author: None,
                 logging_mode: LoggingMode::Silent,
-                grading: GradingSection {
-                    mode: GradingMode::Weighted,
-                },
-                report: ReportSection {
-                    is_verbose: false,
-                    output: ReportOutput::Txt,
-                },
+                grading: GradingSection::new(GradingMode::Weighted,),
+                report: ReportSection::new(false, ReportOutput::Txt),
                 input: InputSection::default(),
                 sections: vec![TestSection {
                     title: Some("Section 1".to_string()),
@@ -898,13 +897,8 @@ mod tests {
                     "test 1".to_string(),
                     None,
                     LoggingMode::Verbose,
-                    GradingSection {
-                        mode: GradingMode::Weighted,
-                    },
-                    ReportSection {
-                        is_verbose: false,
-                        output: ReportOutput::Txt,
-                    },
+                    GradingSection::new(GradingMode::Weighted),
+                    ReportSection::new(false, ReportOutput::Txt),
                     InputSection::build(vec![
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
@@ -932,13 +926,8 @@ mod tests {
                     "test 1".to_string(),
                     None,
                     LoggingMode::Verbose,
-                    GradingSection {
-                        mode: GradingMode::Weighted,
-                    },
-                    ReportSection {
-                        is_verbose: false,
-                        output: ReportOutput::Txt,
-                    },
+                    GradingSection::new(GradingMode::Weighted),
+                    ReportSection::new(false, ReportOutput::Txt),
                     InputSection::build(vec![
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
@@ -964,13 +953,8 @@ mod tests {
                     "test 1".to_string(),
                     None,
                     LoggingMode::Verbose,
-                    GradingSection {
-                        mode: GradingMode::Weighted,
-                    },
-                    ReportSection {
-                        is_verbose: false,
-                        output: ReportOutput::Txt,
-                    },
+                    GradingSection::new(GradingMode::Weighted),
+                    ReportSection::new(false, ReportOutput::Txt),
                     InputSection::build(vec![
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
@@ -997,13 +981,8 @@ mod tests {
                     "test 1".to_string(),
                     None,
                     LoggingMode::Verbose,
-                    GradingSection {
-                        mode: GradingMode::Weighted,
-                    },
-                    ReportSection {
-                        is_verbose: false,
-                        output: ReportOutput::Txt,
-                    },
+                    GradingSection::new(GradingMode::Weighted),
+                    ReportSection::new(false, ReportOutput::Txt),
                     InputSection::build(vec![
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
@@ -1029,13 +1008,8 @@ mod tests {
                     "test 1".to_string(),
                     None,
                     LoggingMode::Verbose,
-                    GradingSection {
-                        mode: GradingMode::Weighted,
-                    },
-                    ReportSection {
-                        is_verbose: false,
-                        output: ReportOutput::Txt,
-                    },
+                    GradingSection::new(GradingMode::Weighted),
+                    ReportSection::new(true, ReportOutput::Txt),
                     InputSection::build(vec![
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
                         ProgramSpecification::Complete {
@@ -1074,13 +1048,8 @@ mod tests {
                     "test 1".to_string(),
                     None,
                     LoggingMode::Verbose,
-                    GradingSection {
-                        mode: GradingMode::Weighted,
-                    },
-                    ReportSection {
-                        is_verbose: false,
-                        output: ReportOutput::Txt,
-                    },
+                    GradingSection::new(GradingMode::Weighted),
+                    ReportSection::new(false, ReportOutput::Txt),
                     InputSection::build(vec![
                         ProgramSpecification::OnlyType(InputType::CompiledProgram),
                         ProgramSpecification::Complete {
@@ -1128,13 +1097,8 @@ mod tests {
                     title: "test 1".to_string(),
                     author: None,
                     logging_mode: LoggingMode::Silent,
-                    grading: GradingSection {
-                        mode: GradingMode::Absolute,
-                    },
-                    report: ReportSection {
-                        is_verbose: false,
-                        output: ReportOutput::Txt,
-                    },
+                    grading: GradingSection::new(GradingMode::Absolute),
+                    report: ReportSection::new(false, ReportOutput::Txt),
                     input: InputSection::default(),
                     sections: vec![
                         TestSection::new_dummy(1),

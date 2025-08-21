@@ -4,8 +4,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReportSection {
-    pub is_verbose: bool,
-    pub output: ReportOutput,
+    is_verbose: bool,
+    output: ReportOutput,
+}
+
+impl ReportSection {
+    pub fn new(is_verbose: bool, output: ReportOutput) -> Self {
+        Self { is_verbose, output }
+    }
 }
 
 #[cfg(test)]
