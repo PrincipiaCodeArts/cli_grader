@@ -21,7 +21,6 @@ use std::{
 #[serde(rename_all = "lowercase")]
 pub enum TableHeaderType {
     Name,
-    Weight,
     // input
     Args,
     Stdin,
@@ -29,6 +28,8 @@ pub enum TableHeaderType {
     Stdout,
     Stderr,
     Status,
+    // grading
+    Weight,
 }
 impl TableHeaderType {
     /// Whether the `content` is compatible with its current table column type.
@@ -270,7 +271,6 @@ impl<'de> Deserialize<'de> for Table {
 #[serde(deny_unknown_fields)]
 struct DetailedTestUnchecked {
     name: Option<String>,
-    weight: Option<u32>,
     // input
     args: Option<String>,
     stdin: Option<String>,
@@ -278,6 +278,8 @@ struct DetailedTestUnchecked {
     stdout: Option<String>,
     stderr: Option<String>,
     status: Option<i32>,
+    // grading
+    weight: Option<u32>,
 }
 
 // Reference: https://users.rust-lang.org/t/struct-members-validation-on-serde-json-deserialize/123201/16
@@ -285,7 +287,6 @@ struct DetailedTestUnchecked {
 #[serde(try_from = "DetailedTestUnchecked")]
 pub struct DetailedTest {
     name: Option<String>,
-    weight: Option<u32>,
     // input
     args: Option<String>,
     stdin: Option<String>,
@@ -293,41 +294,46 @@ pub struct DetailedTest {
     stdout: Option<String>,
     stderr: Option<String>,
     status: Option<i32>,
+    // grading
+    weight: Option<u32>,
 }
 
 impl DetailedTest {
     pub fn build(
         name: Option<String>,
-        weight: Option<u32>,
+        // input
         args: Option<String>,
         stdin: Option<String>,
+        // expect
         stdout: Option<String>,
         stderr: Option<String>,
         status: Option<i32>,
+        // grading
+        weight: Option<u32>,
     ) -> Result<Self, &'static str> {
         if stdout.is_none() && stderr.is_none() && status.is_none() {
             return Err("at least one of {stdout, stderr, status} must be non-null");
         }
         Ok(Self {
             name,
-            weight,
             args,
             stdin,
             stdout,
             stderr,
             status,
+            weight,
         })
     }
 
     fn build_grading_assertion(&self, n: usize) -> Result<UnitTestAssertion, &'static str> {
         let DetailedTest {
             name,
-            weight,
             args: args_string,
             stdin,
             stdout,
             stderr,
             status,
+            weight,
         } = self;
         let mut args = vec![];
 
@@ -355,12 +361,12 @@ impl DetailedTest {
     fn new_dummy(n: u32) -> Self {
         Self {
             name: Some(format!("test {n}")),
-            weight: Some(n),
             args: Some("arg1 arg2 arg3".to_string()),
             stdin: Some(format!("in {n}")),
             stdout: Some(format!("out {n}")),
             stderr: Some(format!("err {n}")),
             status: Some(0),
+            weight: Some(n),
         }
     }
 }
@@ -371,15 +377,15 @@ impl TryFrom<DetailedTestUnchecked> for DetailedTest {
     fn try_from(value: DetailedTestUnchecked) -> Result<Self, Self::Error> {
         let DetailedTestUnchecked {
             name,
-            weight,
             args,
             stdin,
             stdout,
             stderr,
             status,
+            weight,
         } = value;
 
-        DetailedTest::build(name, weight, args, stdin, stdout, stderr, status)
+        DetailedTest::build(name, args, stdin, stdout, stderr, status, weight)
     }
 }
 
@@ -1209,10 +1215,10 @@ mod tests {
             fn should_match_a_simple_detailed_test() {
                 let t = DetailedTest::build(
                     None,
-                    None,
                     Some("arg1 arg2 \" an arg \"".to_string()),
                     Some("".to_string()),
                     Some("".to_string()),
+                    None,
                     None,
                     None,
                 )
@@ -1240,12 +1246,12 @@ mod tests {
             fn should_match_a_full_detailed_test() {
                 let t = DetailedTest::build(
                     Some("name abc".to_string()),
-                    Some(12),
                     Some("a1 a2 a3".to_string()),
                     Some("stdin abc".to_string()),
                     Some("stdout abc".to_string()),
                     Some("stderr abc".to_string()),
                     Some(0),
+                    Some(12),
                 )
                 .unwrap();
                 assert_eq!(
@@ -1579,22 +1585,22 @@ mod tests {
                     vec![
                         DetailedTest::build(
                             None,
-                            Some(2),
                             Some("a b c".to_string()),
                             Some("stdin".to_string()),
                             Some("".to_string()),
                             None,
                             Some(3),
+                            Some(2),
                         )
                         .unwrap(),
                         DetailedTest::build(
                             Some("test abc".to_string()),
-                            None,
                             Some("a b".to_string()),
                             Some("stdin".to_string()),
                             Some("".to_string()),
                             None,
                             Some(3),
+                            None,
                         )
                         .unwrap(),
                     ],

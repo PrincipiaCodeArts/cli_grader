@@ -51,12 +51,12 @@ impl AssertionResult {
     fn new(name: String, weight: u32) -> Self {
         Self {
             name,
-            weight,
             passed: false,
             execution_status: ExecutionStatus::Undefined,
             stdout_diagnostics: None,
             stderr_diagnostics: None,
             status_diagnostics: None,
+            weight,
         }
     }
 
@@ -91,13 +91,17 @@ impl AssertionResult {
 }
 
 impl Assertion {
+    // TODO (remove) or make it test only
     pub fn new(
         name: String,
+        // conf
         args: Vec<String>,
         stdin: Option<String>,
+        // expect
         stdout: Option<String>,
         stderr: Option<String>,
         status: Option<i32>,
+        // grading
         weight: u32,
     ) -> Self {
         Self {
@@ -111,15 +115,16 @@ impl Assertion {
         }
     }
 
-    // TODO (standard): standardize the order of the parameters for assertion-related
-    // elements.
-    pub(crate) fn build(
+    pub fn build(
         name: String,
+        // input
         args: Vec<String>,
         stdin: Option<String>,
+        // expect
         stdout: Option<String>,
         stderr: Option<String>,
         status: Option<i32>,
+        // grading
         weight: u32,
     ) -> Result<Self, &'static str> {
         if stdout.is_none() && stderr.is_none() && status.is_none() {
