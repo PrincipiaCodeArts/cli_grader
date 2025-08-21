@@ -49,7 +49,15 @@ impl TableHeaderType {
         }
     }
 
-    fn is_expect_type(&self) -> bool {
+    /// When defining an assertion for a unit test, some of the fields that may be specified
+    /// are for expectation purposes. In other words, those fields are used to make the
+    /// assertions that will define whether the program passed or not the tests.
+    ///
+    /// # Expect Types
+    /// - Stdout
+    /// - Stderr
+    /// - Status
+    fn is_of_type_expect(&self) -> bool {
         matches!(
             self,
             TableHeaderType::Stdout | TableHeaderType::Stderr | TableHeaderType::Status
@@ -103,7 +111,7 @@ impl Table {
         let row_size = header.len();
         let mut has_expect_col_type = false;
         for h in &header {
-            if h.is_expect_type() {
+            if h.is_of_type_expect() {
                 has_expect_col_type = true;
                 break;
             }
