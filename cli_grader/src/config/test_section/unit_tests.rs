@@ -820,7 +820,7 @@ mod tests {
 
             #[test]
             #[should_panic]
-            fn should_panic_when_assertion_is_not_built_properly() {
+            fn should_panic_when_assertion_does_not_have_expect_element() {
                 let invalid_table = Table {
                     header: vec![
                         TableHeaderType::Name,
