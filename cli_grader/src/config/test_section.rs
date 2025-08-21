@@ -46,9 +46,9 @@ impl Tests {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "TestSectionUnchecked", into = "TestSectionUnchecked")]
 pub struct TestSection {
-    pub title: Option<String>,
-    pub weight: Option<u32>,
-    pub tests: Tests,
+    title: Option<String>,
+    weight: Option<u32>,
+    tests: Tests,
 }
 
 impl From<TestSection> for TestSectionUnchecked {
@@ -70,7 +70,7 @@ impl From<TestSection> for TestSectionUnchecked {
 }
 
 impl TestSection {
-    fn build(
+    pub fn build(
         title: Option<String>,
         weight: Option<u32>,
         unit_tests: Option<UnitTests>,
@@ -84,6 +84,10 @@ impl TestSection {
             weight,
             tests: Tests::UnitTests(unit_tests.expect("unit_tests is not none at this point")),
         })
+    }
+
+    pub fn get_tests(&self) -> &Tests {
+        &self.tests
     }
 
     pub fn build_grading_section(

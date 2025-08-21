@@ -1,10 +1,10 @@
 use crate::{
+    GradingConfig, LoggingMode,
     config::{
         grading_section::GradingSection, input_section::InputSection,
         report_section::ReportSection, test_section::TestSection,
     },
     input::ExecutableArtifact,
-    GradingConfig, LoggingMode,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, marker, path::PathBuf};
@@ -83,10 +83,10 @@ impl GlobalConfig<NotInitialized> {
         }
 
         for s in &sections {
-            match &s.tests {
+            match s.get_tests() {
                 test_section::Tests::UnitTests(unit_tests) => {
-                    for t in &unit_tests.tests {
-                        if let Some(name) = &t.program_name
+                    for t in unit_tests.get_tests() {
+                        if let Some(name) = t.get_program_name()
                             && !input.contains_program_name(name)
                         {
                             return Err("program name out of scope");
@@ -278,7 +278,6 @@ mod tests {
 
     mod test_configuration {
         use super::*;
-        use crate::config::test_section::Tests;
         use crate::grader::score::GradingMode;
         use crate::{
             config::{
@@ -303,43 +302,61 @@ mod tests {
                 grading: GradingSection::new(GradingMode::Weighted,),
                 report: ReportSection::new(false, ReportOutput::Txt),
                 input: InputSection::default(),
-                sections: vec![TestSection {
-                    title: Some("Section 1".to_string()),
-                    weight: Some(12),
-                    tests: Tests::UnitTests(UnitTests {
-                        env: vec![],
-                        inherit_parent_env: false,
-                        files: vec![("file 1".to_string(), "content 1".to_string())],
-                        setup: vec![],
-                        teardown: vec![],
-                        tests: vec![UnitTest {
-                            title: None,
-                            program_name: Some("p1".to_string()),
-                            table: Some(Table {
-                                row_size: 3,
-                                header: vec![
-                                    TableHeaderType::Args,
-                                    TableHeaderType::Name,
-                                    TableHeaderType::Stdout,
+                sections: vec![
+                    TestSection::build(
+                        Some("Section 1".to_string()),
+                        Some(12),
+                        Some(
+                            UnitTests::build(
+                                vec![],
+                                false,
+                                vec![("file 1".to_string(), "content 1".to_string())],
+                                vec![],
+                                vec![],
+                                vec![
+                                    UnitTest::build(
+                                        None,
+                                        Some("p1".to_string()),
+                                        Some(
+                                            Table::build(
+                                                vec![
+                                                    TableHeaderType::Args,
+                                                    TableHeaderType::Name,
+                                                    TableHeaderType::Stdout,
+                                                ],
+                                                vec![vec![
+                                                    TableCellContent::String(
+                                                        "arg1 arg2 arg3".to_string()
+                                                    ),
+                                                    TableCellContent::String("test1".to_string()),
+                                                    TableCellContent::String(
+                                                        "expected".to_string()
+                                                    ),
+                                                ]],
+                                            )
+                                            .unwrap()
+                                        ),
+                                        vec![
+                                            DetailedTest::build(
+                                                Some("test2".to_string()),
+                                                Some(2),
+                                                Some("a1 a2 a3 a4".to_string()),
+                                                None,
+                                                None,
+                                                None,
+                                                Some(23),
+                                            )
+                                            .unwrap()
+                                        ],
+                                    )
+                                    .unwrap()
                                 ],
-                                tests: vec![vec![
-                                    TableCellContent::String("arg1 arg2 arg3".to_string()),
-                                    TableCellContent::String("test1".to_string()),
-                                    TableCellContent::String("expected".to_string()),
-                                ]],
-                            }),
-                            detailed_tests: vec![DetailedTest {
-                                name: Some("test2".to_string()),
-                                args: Some("a1 a2 a3 a4".to_string()),
-                                stdin: None,
-                                stdout: None,
-                                stderr: None,
-                                status: Some(23),
-                                weight: Some(2),
-                            }],
-                        }],
-                    }),
-                }],
+                            )
+                            .unwrap()
+                        ),
+                    )
+                    .unwrap()
+                ],
                 executables_by_name: None,
             },
             GlobalConfig

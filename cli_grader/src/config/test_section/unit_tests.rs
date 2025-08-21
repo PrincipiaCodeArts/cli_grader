@@ -1,15 +1,15 @@
 use crate::{
     config::DEFAULT_MAIN_PROGRAM_NAME,
     grader::grading_tests::unit_test::{
-        assertion::Assertion as UnitTestAssertion, UnitTest as GradingUnitTest,
-        UnitTests as GradingUnitTests,
+        UnitTest as GradingUnitTest, UnitTests as GradingUnitTests,
+        assertion::Assertion as UnitTestAssertion,
     },
     input::ExecutableArtifact,
 };
 use serde::{
+    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
-    Deserialize, Serialize,
 };
 use shlex::Shlex;
 use std::{
@@ -94,14 +94,12 @@ impl TableCellContent {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Table {
-    // TODO (remove_field): check if row_size is really necessary, and remove it, if not.
-    pub row_size: usize,
-    pub header: Vec<TableHeaderType>,
-    pub tests: Vec<Vec<TableCellContent>>,
+    header: Vec<TableHeaderType>,
+    tests: Vec<Vec<TableCellContent>>,
 }
 
 impl Table {
-    fn build(
+    pub fn build(
         header: Vec<TableHeaderType>,
         tests: Vec<Vec<TableCellContent>>,
     ) -> Result<Self, &'static str> {
@@ -136,11 +134,7 @@ impl Table {
                 return Err("inconsistent type from table test content cell");
             }
         }
-        Ok(Self {
-            row_size,
-            header,
-            tests,
-        })
+        Ok(Self { header, tests })
     }
     fn build_grading_assertions(
         &self,
@@ -190,7 +184,6 @@ impl Table {
     #[cfg(test)]
     fn new_dummy() -> Self {
         Self {
-            row_size: 3,
             header: vec![
                 TableHeaderType::Name,
                 TableHeaderType::Args,
@@ -295,19 +288,19 @@ struct DetailedTestUnchecked {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "DetailedTestUnchecked")]
 pub struct DetailedTest {
-    pub name: Option<String>,
-    pub weight: Option<u32>,
+    name: Option<String>,
+    weight: Option<u32>,
     // input
-    pub args: Option<String>,
-    pub stdin: Option<String>,
+    args: Option<String>,
+    stdin: Option<String>,
     // expect
-    pub stdout: Option<String>,
-    pub stderr: Option<String>,
-    pub status: Option<i32>,
+    stdout: Option<String>,
+    stderr: Option<String>,
+    status: Option<i32>,
 }
 
 impl DetailedTest {
-    fn build(
+    pub fn build(
         name: Option<String>,
         weight: Option<u32>,
         args: Option<String>,
@@ -407,7 +400,7 @@ struct UnitTestUnchecked {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "UnitTestUnchecked")]
 pub struct UnitTest {
-    pub title: Option<String>,
+    title: Option<String>,
     /// This field specify the reference to the program that will be tested by this instance
     /// of unit test. It may be the standard name of the program (`program<number>`, with
     /// `<number>` any of 1, 2, ...) or its alias. It is invalid to specify a name that was
@@ -416,13 +409,13 @@ pub struct UnitTest {
     /// # Caveats
     /// - If no program name is specified (None), it will logically default to the main
     ///   program (`program1` or `p1`).
-    pub program_name: Option<String>,
-    pub table: Option<Table>,
-    pub detailed_tests: Vec<DetailedTest>,
+    program_name: Option<String>,
+    table: Option<Table>,
+    detailed_tests: Vec<DetailedTest>,
 }
 
 impl UnitTest {
-    fn build(
+    pub fn build(
         title: Option<String>,
         program_name: Option<String>,
         table: Option<Table>,
@@ -437,6 +430,10 @@ impl UnitTest {
             table,
             detailed_tests,
         })
+    }
+
+    pub fn get_program_name(&self) -> Option<&str> {
+        self.program_name.as_deref()
     }
 
     fn build_grading_unit_test(
@@ -522,16 +519,16 @@ struct UnitTestsUnchecked {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "UnitTestsUnchecked")]
 pub struct UnitTests {
-    pub env: Vec<(Key, Value)>,
-    pub inherit_parent_env: bool,
-    pub files: Vec<(String, FileContent)>,
-    pub setup: Vec<Command>,
-    pub teardown: Vec<Command>,
-    pub tests: Vec<UnitTest>,
+    env: Vec<(Key, Value)>,
+    inherit_parent_env: bool,
+    files: Vec<(String, FileContent)>,
+    setup: Vec<Command>,
+    teardown: Vec<Command>,
+    tests: Vec<UnitTest>,
 }
 
 impl UnitTests {
-    fn build(
+    pub fn build(
         env: Vec<(Key, Value)>,
         inherit_parent_env: bool,
         files: Vec<(String, FileContent)>,
@@ -550,6 +547,9 @@ impl UnitTests {
             teardown,
             tests,
         })
+    }
+    pub fn get_tests(&self) -> &[UnitTest] {
+        &self.tests
     }
 
     pub fn build_grading_unit_tests(
@@ -688,7 +688,6 @@ mod tests {
         test_serialize_and_deserialize!(
             should_serialize_table,
             Table {
-                row_size: 4,
                 header: vec![
                     TableHeaderType::Name,
                     TableHeaderType::Args,
@@ -808,7 +807,6 @@ mod tests {
             #[should_panic]
             fn should_panic_when_assertion_is_not_built_properly() {
                 let invalid_table = Table {
-                    row_size: 3,
                     header: vec![
                         TableHeaderType::Name,
                         TableHeaderType::Stdin,
@@ -1524,7 +1522,6 @@ mod tests {
                     title: Some("UnitTest1".to_string()),
                     program_name: Some("some program".to_string()),
                     table: Some(Table {
-                        row_size: 2,
                         header: vec![TableHeaderType::Name, TableHeaderType::Args],
                         tests: vec![
                             vec![
