@@ -622,6 +622,9 @@ impl UnitTests {
 impl TryFrom<UnitTestsUnchecked> for UnitTests {
     type Error = &'static str;
 
+    /// # Default
+    /// - `inherit_parent_env`: defaults to `true` if a `None` is received from the
+    /// `UnitTestUnchecked`.
     fn try_from(value: UnitTestsUnchecked) -> Result<Self, Self::Error> {
         let UnitTestsUnchecked {
             env,
