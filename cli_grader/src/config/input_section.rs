@@ -137,8 +137,6 @@ impl InputSection {
         self.program_name_by_index[program_name]
     }
 
-    /// Returns the type of the program with name `program_name`. It that program is not
-    /// available in this namespace, it returns `None`.
     pub fn get_program_type_unchecked(&self, program_name: &str) -> InputType {
         let i = self.program_name_by_index[program_name];
         self.input_programs[i].get_program_type()
