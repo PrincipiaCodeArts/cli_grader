@@ -564,6 +564,12 @@ impl UnitTests {
     ) -> Result<GradingUnitTests, &'static str> {
         let mut unit_tests = vec![];
 
+        /// Process a slice of raw string commands (String) into a vector of commands in
+        /// the format: (Command, Vec<Arg>).
+        ///
+        /// # Example
+        /// Transforms the raw string command: `"cmd1 arg1 arg2 arg3"` into
+        /// ("cmd1", ["arg1", "arg2", "arg3"])
         fn process_raw_string_commands(
             commands: &[String],
         ) -> Result<Vec<(String, Vec<String>)>, &'static str> {
