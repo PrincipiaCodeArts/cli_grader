@@ -1,15 +1,15 @@
 use crate::{
     config::DEFAULT_MAIN_PROGRAM_NAME,
     grader::grading_tests::unit_test::{
-        UnitTest as GradingUnitTest, UnitTests as GradingUnitTests,
-        assertion::Assertion as UnitTestAssertion,
+        assertion::Assertion as UnitTestAssertion, UnitTest as GradingUnitTest,
+        UnitTests as GradingUnitTests,
     },
     input::ExecutableArtifact,
 };
 use serde::{
-    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
+    Deserialize, Serialize,
 };
 use shlex::Shlex;
 use std::{
@@ -253,11 +253,7 @@ impl<'de> Visitor<'de> for TableVisitor {
         while let Some(t) = seq.next_element()? {
             tests.push(t);
         }
-
-        match Table::build(header, tests) {
-            Ok(v) => Ok(v),
-            Err(msg) => Err(de::Error::custom(msg)),
-        }
+        Table::build(header, tests).map_err(de::Error::custom)
     }
 }
 
