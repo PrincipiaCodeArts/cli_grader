@@ -1,8 +1,5 @@
 use crate::{
-    config::{
-        DEFAULT_MAIN_PROGRAM_NAME1, DEFAULT_MAIN_PROGRAM_NAME2, DEFAULT_PREFIX_PROGRAM_NAME1,
-        DEFAULT_PREFIX_PROGRAM_NAME2,
-    },
+    config::{DEFAULT_PREFIX_PROGRAM_NAME1, DEFAULT_PREFIX_PROGRAM_NAME2},
     input::ProgramType,
 };
 use serde::{Deserialize, Serialize};
@@ -153,13 +150,9 @@ impl InputSection {
 
 impl Default for InputSection {
     fn default() -> Self {
-        Self {
-            input_programs: vec![ProgramSpecification::default()],
-            program_name_by_index: HashMap::from_iter([
-                (DEFAULT_MAIN_PROGRAM_NAME1.to_string(), 0),
-                (DEFAULT_MAIN_PROGRAM_NAME2.to_string(), 0),
-            ]),
-        }
+        Self::build(vec![ProgramSpecification::default()]).expect(
+            "it is expected that an input section with one default program specification works",
+        )
     }
 }
 
@@ -300,8 +293,8 @@ mod tests {
                 ],
                 program_name_by_index: HashMap::from_iter([
                     // p1
-                    (DEFAULT_MAIN_PROGRAM_NAME1.to_string(), 0),
-                    (DEFAULT_MAIN_PROGRAM_NAME2.to_string(), 0),
+                    (format!("{DEFAULT_PREFIX_PROGRAM_NAME1}1"), 0),
+                    (format!("{DEFAULT_PREFIX_PROGRAM_NAME2}1"), 0),
                     // p2
                     (format!("{DEFAULT_PREFIX_PROGRAM_NAME1}2"), 1),
                     (format!("{DEFAULT_PREFIX_PROGRAM_NAME2}2"), 1),

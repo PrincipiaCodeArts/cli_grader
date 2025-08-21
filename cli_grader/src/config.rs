@@ -14,8 +14,7 @@ mod input_section;
 mod report_section;
 mod test_section;
 
-const DEFAULT_MAIN_PROGRAM_NAME1: &str = "program1";
-const DEFAULT_MAIN_PROGRAM_NAME2: &str = "p1";
+const DEFAULT_MAIN_PROGRAM_NAME: &str = "program1";
 const DEFAULT_PREFIX_PROGRAM_NAME1: &str = "program";
 const DEFAULT_PREFIX_PROGRAM_NAME2: &str = "p";
 

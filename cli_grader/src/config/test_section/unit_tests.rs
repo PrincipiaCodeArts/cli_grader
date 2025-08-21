@@ -1,15 +1,15 @@
 use crate::{
-    config::DEFAULT_MAIN_PROGRAM_NAME1,
+    config::DEFAULT_MAIN_PROGRAM_NAME,
     grader::grading_tests::unit_test::{
-        UnitTest as GradingUnitTest, UnitTests as GradingUnitTests,
-        assertion::Assertion as UnitTestAssertion,
+        assertion::Assertion as UnitTestAssertion, UnitTest as GradingUnitTest,
+        UnitTests as GradingUnitTests,
     },
     input::ExecutableArtifact,
 };
 use serde::{
-    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
+    Deserialize, Serialize,
 };
 use shlex::Shlex;
 use std::{
@@ -438,7 +438,7 @@ impl UnitTest {
     ) -> Result<GradingUnitTest, &'static str> {
         // try to get the executable
         let default_name = format!("Unit Test {n}");
-        let default_program_name = DEFAULT_MAIN_PROGRAM_NAME1.to_string();
+        let default_program_name = DEFAULT_MAIN_PROGRAM_NAME.to_string();
         let executable =
             executables_by_name.get(self.program_name.as_ref().unwrap_or(&default_program_name));
         if executable.is_none() {
