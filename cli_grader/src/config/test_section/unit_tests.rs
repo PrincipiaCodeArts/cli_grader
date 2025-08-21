@@ -1407,6 +1407,19 @@ mod tests {
         );
         // valid deserialization
         test_valid_deserialization!(
+            should_accept_without_title_and_program_name,
+            r#"
+        {
+            "table":[
+                ["name", "args", "status"],
+                ["test 1", "a1 a2", 0],
+                ["test 2", "a1 a3", 1],
+                ["test 3", "a1 a3 a4", 2]
+            ]
+        }"#,
+            UnitTest
+        );
+        test_valid_deserialization!(
             should_accept_with_table,
             r#"
         {
