@@ -133,7 +133,7 @@ mod tests {
     mod grading_config_tests {
         use super::*;
         use crate::{
-            grader::grading_tests::unit_test::{UnitTest, UnitTests, assertion::Assertion},
+            grader::grading_tests::unit_test::{assertion::Assertion, UnitTest, UnitTests},
             input::ExecutableArtifact,
         };
         use std::vec;
@@ -244,7 +244,7 @@ mod tests {
         use super::*;
         use crate::{
             grader::grading_tests::unit_test::{
-                UnitTest, UnitTestResult, UnitTests, UnitTestsResult, assertion::Assertion,
+                assertion::Assertion, UnitTest, UnitTestResult, UnitTests, UnitTestsResult,
             },
             input::ExecutableArtifact,
         };
@@ -272,7 +272,7 @@ mod tests {
                 path: "cat".into(),
             };
             // Add the first grading section
-            let assertion1 = Assertion::new(
+            let assertion1 = Assertion::build(
                 "should return \"hello world\"".to_string(),
                 vec!["file.txt".to_string()],
                 None,
@@ -280,9 +280,10 @@ mod tests {
                 None,
                 Some(0),
                 1,
-            );
+            )
+            .unwrap();
             let expected_assertion1 = assertion1.expected_result(None, true, None, None, None);
-            let assertion2 = Assertion::new(
+            let assertion2 = Assertion::build(
                 "should return \"hello   world\"".to_string(),
                 vec!["file2.txt".to_string()],
                 None,
@@ -290,7 +291,8 @@ mod tests {
                 None,
                 Some(0),
                 13,
-            );
+            )
+            .unwrap();
             let expected_assertion2 = assertion2.expected_result(None, true, None, None, None);
             let section1_tests = GradingTests::UnitTests(UnitTests::new(
                 vec![],
@@ -334,15 +336,13 @@ mod tests {
                                     current: 14,
                                     max: 14
                                 },
-                                vec![
-                                    UnitTestResult::new(
-                                        program_unit_assertions_name,
-                                        target_program.name(),
-                                        GradingMode::Weighted
-                                    )
-                                    .with_assertion_result(expected_assertion1)
-                                    .with_assertion_result(expected_assertion2)
-                                ]
+                                vec![UnitTestResult::new(
+                                    program_unit_assertions_name,
+                                    target_program.name(),
+                                    GradingMode::Weighted
+                                )
+                                .with_assertion_result(expected_assertion1)
+                                .with_assertion_result(expected_assertion2)]
                             )
                         )),
                     }]

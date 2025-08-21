@@ -841,7 +841,7 @@ mod tests {
                 .unwrap();
                 assert_eq!(
                     t.build_grading_assertions(1).unwrap(),
-                    vec![UnitTestAssertion::new(
+                    vec![UnitTestAssertion::build(
                         "test 1".to_string(),
                         vec![],
                         None,
@@ -849,7 +849,8 @@ mod tests {
                         None,
                         Some(0),
                         1,
-                    )]
+                    )
+                    .unwrap()]
                 );
             }
             #[test]
@@ -881,7 +882,7 @@ mod tests {
                 assert_eq!(
                     t.build_grading_assertions(1).unwrap(),
                     vec![
-                        UnitTestAssertion::new(
+                        UnitTestAssertion::build(
                             "Assertion 1".to_string(),
                             vec!["arg1".to_string()],
                             None,
@@ -889,8 +890,9 @@ mod tests {
                             None,
                             Some(0),
                             1,
-                        ),
-                        UnitTestAssertion::new(
+                        )
+                        .unwrap(),
+                        UnitTestAssertion::build(
                             "Assertion 2".to_string(),
                             vec!["arg1".to_string()],
                             None,
@@ -898,8 +900,9 @@ mod tests {
                             None,
                             Some(0),
                             1,
-                        ),
-                        UnitTestAssertion::new(
+                        )
+                        .unwrap(),
+                        UnitTestAssertion::build(
                             "Assertion 3".to_string(),
                             vec!["arg1    ".to_string()],
                             None,
@@ -907,8 +910,9 @@ mod tests {
                             None,
                             Some(0),
                             1,
-                        ),
-                        UnitTestAssertion::new(
+                        )
+                        .unwrap(),
+                        UnitTestAssertion::build(
                             "Assertion 4".to_string(),
                             vec![
                                 "arg1".to_string(),
@@ -924,6 +928,7 @@ mod tests {
                             Some(0),
                             1,
                         )
+                        .unwrap()
                     ]
                 );
             }
@@ -962,7 +967,7 @@ mod tests {
                 assert_eq!(
                     t.build_grading_assertions(1).unwrap(),
                     vec![
-                        UnitTestAssertion::new(
+                        UnitTestAssertion::build(
                             "test 1".to_string(),
                             vec![],
                             None,
@@ -970,8 +975,9 @@ mod tests {
                             None,
                             Some(0),
                             1,
-                        ),
-                        UnitTestAssertion::new(
+                        )
+                        .unwrap(),
+                        UnitTestAssertion::build(
                             "test 2".to_string(),
                             vec![],
                             None,
@@ -979,8 +985,9 @@ mod tests {
                             None,
                             Some(0),
                             2,
-                        ),
-                        UnitTestAssertion::new(
+                        )
+                        .unwrap(),
+                        UnitTestAssertion::build(
                             "test 3".to_string(),
                             vec![],
                             None,
@@ -988,7 +995,8 @@ mod tests {
                             None,
                             Some(1),
                             3,
-                        ),
+                        )
+                        .unwrap(),
                     ]
                 );
             }
@@ -1022,7 +1030,7 @@ mod tests {
                 assert_eq!(
                     t.build_grading_assertions(2).unwrap(),
                     vec![
-                        UnitTestAssertion::new(
+                        UnitTestAssertion::build(
                             "Assertion 2".to_string(),
                             vec![],
                             None,
@@ -1030,8 +1038,9 @@ mod tests {
                             None,
                             Some(0),
                             1,
-                        ),
-                        UnitTestAssertion::new(
+                        )
+                        .unwrap(),
+                        UnitTestAssertion::build(
                             "Assertion 3".to_string(),
                             vec![],
                             None,
@@ -1039,8 +1048,9 @@ mod tests {
                             None,
                             Some(0),
                             2,
-                        ),
-                        UnitTestAssertion::new(
+                        )
+                        .unwrap(),
+                        UnitTestAssertion::build(
                             "Assertion 4".to_string(),
                             vec![],
                             None,
@@ -1048,7 +1058,8 @@ mod tests {
                             None,
                             Some(1),
                             3,
-                        ),
+                        )
+                        .unwrap(),
                     ]
                 );
             }
