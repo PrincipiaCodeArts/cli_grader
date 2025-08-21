@@ -444,20 +444,20 @@ impl UnitTest {
         executables_by_name: &HashMap<String, ExecutableArtifact>,
     ) -> Result<GradingUnitTest, &'static str> {
         // try to get the executable
-        let executable = executables_by_name.get(
-            self.program_name
-                .as_ref()
-                .unwrap_or(&DEFAULT_MAIN_PROGRAM_NAME.to_string()),
-        );
-        if executable.is_none() {
-            return Err("executable not found");
-        }
+        let executable = executables_by_name
+            .get(
+                self.program_name
+                    .as_ref()
+                    .unwrap_or(&DEFAULT_MAIN_PROGRAM_NAME.to_string()),
+            )
+            .ok_or("executable not found")?;
+
         let mut unit_test = GradingUnitTest::new(
             self.title
                 .as_ref()
                 .unwrap_or(&format!("Unit Test {n}"))
                 .clone(),
-            executable.unwrap().clone(),
+            executable.clone(),
         );
 
         // add assertions
