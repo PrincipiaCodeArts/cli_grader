@@ -1014,7 +1014,7 @@ mod tests {
                 );
             }
             #[test]
-            fn should_match_a_with_default_table_test_name() {
+            fn should_match_with_default_table_test_name() {
                 let t = Table::build(
                     vec![
                         TableHeaderType::Status,
@@ -1433,7 +1433,7 @@ mod tests {
             UnitTest
         );
         test_valid_deserialization!(
-            should_accept_with_table,
+            should_accept_table,
             r#"
         {
             "title":"name 1",
@@ -1449,7 +1449,7 @@ mod tests {
         );
 
         test_valid_deserialization!(
-            should_accept_with_table_tests_but_empty_detailed_test,
+            should_accept_table_but_with_empty_detailed_test,
             r#"
         {
             "title":"name 1",
@@ -1657,7 +1657,7 @@ mod tests {
 
                 assert_eq!(
                     u.build_grading_unit_test(2, &executables_by_name).unwrap(),
-                    GradingUnitTest::new_for_test(
+                    GradingUnitTest::new_dummy(
                         "UnitTest1".to_string(),
                         executable,
                         vec![
@@ -1868,7 +1868,7 @@ mod tests {
             use std::path::PathBuf;
             #[test]
             #[should_panic]
-            fn should_panic_when_there_is_invalid_command_in_setup() {
+            fn should_panic_with_empty_setup_command() {
                 let r = UnitTests::build(
                     vec![],
                     true,
@@ -1898,7 +1898,7 @@ mod tests {
 
             #[test]
             #[should_panic]
-            fn should_panic_when_there_is_invalid_command_in_teardown() {
+            fn should_panic_with_empty_teardown_command() {
                 let r = UnitTests::build(
                     vec![],
                     false,

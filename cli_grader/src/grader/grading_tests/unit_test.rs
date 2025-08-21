@@ -26,7 +26,7 @@ impl UnitTest {
     }
 
     #[cfg(test)]
-    pub fn new_for_test(
+    pub fn new_dummy(
         name: String,
         executable: ExecutableArtifact,
         assertions: Vec<Assertion>,
@@ -44,16 +44,16 @@ impl UnitTest {
         self
     }
 
-    pub(crate) fn add_assertion(&mut self, assertion: Assertion) {
+    pub fn add_assertion(&mut self, assertion: Assertion) {
         self.assertions.push(assertion);
     }
 
-    pub(crate) fn add_assertions(&mut self, assertions: Vec<Assertion>) {
+    pub fn add_assertions(&mut self, assertions: Vec<Assertion>) {
         self.assertions.extend(assertions);
     }
 
     /// Get the number of assertions.
-    pub(crate) fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         self.assertions.len()
     }
 
@@ -173,6 +173,12 @@ impl UnitTestResult {
 
 // TODO add type alias to improve the signature of `UnitTest`
 // type Command = String;
+
+type Key = String;
+type Value = String;
+type Command = String;
+type Arg = String;
+type FileContent = String;
 /// Set of `UnitTest`s.
 ///
 /// Each `UnitTest` will be the execution of an executable artifact along with some
@@ -184,16 +190,14 @@ impl UnitTestResult {
 /// # Fields
 /// - `inherit_parent_env`: whether it will inherit the environment variables from
 ///   parent process.
-/// - files: Vec of `(<filename>, <file_content>)`.
-/// - setup: Vec of (<command, Vec of args)
-/// - teardown: Vec of (<command, Vec of args)
+/// - `files`: Vec of `(<filename>, <file_content>)`.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UnitTests {
-    env: Vec<(String, String)>,
+    env: Vec<(Key, Value)>,
     inherit_parent_env: bool,
-    files: Vec<(String, String)>,
-    setup: Vec<(String, Vec<String>)>,
-    teardown: Vec<(String, Vec<String>)>,
+    files: Vec<(String, FileContent)>,
+    setup: Vec<(Command, Vec<Arg>)>,
+    teardown: Vec<(Command, Vec<Arg>)>,
     unit_tests: Vec<UnitTest>,
 }
 
