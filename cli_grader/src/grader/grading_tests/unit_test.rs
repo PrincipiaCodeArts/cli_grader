@@ -171,9 +171,6 @@ impl UnitTestResult {
     }
 }
 
-// TODO add type alias to improve the signature of `UnitTest`
-// type Command = String;
-
 type Key = String;
 type Value = String;
 type Command = String;

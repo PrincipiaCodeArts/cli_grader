@@ -1,15 +1,15 @@
 use crate::{
     config::DEFAULT_MAIN_PROGRAM_NAME,
     grader::grading_tests::unit_test::{
-        assertion::Assertion as UnitTestAssertion, UnitTest as GradingUnitTest,
-        UnitTests as GradingUnitTests,
+        UnitTest as GradingUnitTest, UnitTests as GradingUnitTests,
+        assertion::Assertion as UnitTestAssertion,
     },
     input::ExecutableArtifact,
 };
 use serde::{
+    Deserialize, Serialize,
     de::{self, Visitor},
     ser::SerializeSeq,
-    Deserialize, Serialize,
 };
 use shlex::Shlex;
 use std::{
@@ -624,7 +624,7 @@ impl TryFrom<UnitTestsUnchecked> for UnitTests {
 
     /// # Default
     /// - `inherit_parent_env`: defaults to `true` if a `None` is received from the
-    /// `UnitTestUnchecked`.
+    ///   `UnitTestUnchecked`.
     fn try_from(value: UnitTestsUnchecked) -> Result<Self, Self::Error> {
         let UnitTestsUnchecked {
             env,
@@ -854,16 +854,18 @@ mod tests {
                 .unwrap();
                 assert_eq!(
                     t.build_grading_assertions(1).unwrap(),
-                    vec![UnitTestAssertion::build(
-                        "test 1".to_string(),
-                        vec![],
-                        None,
-                        None,
-                        None,
-                        Some(0),
-                        1,
-                    )
-                    .unwrap()]
+                    vec![
+                        UnitTestAssertion::build(
+                            "test 1".to_string(),
+                            vec![],
+                            None,
+                            None,
+                            None,
+                            Some(0),
+                            1,
+                        )
+                        .unwrap()
+                    ]
                 );
             }
             #[test]

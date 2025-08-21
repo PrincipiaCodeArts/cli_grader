@@ -1,10 +1,10 @@
 use crate::{
+    GradingConfig, LoggingMode,
     config::{
         grading_section::GradingSection, input_section::InputSection,
         report_section::ReportSection, test_section::TestSection,
     },
     input::ExecutableArtifact,
-    GradingConfig, LoggingMode,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, marker, path::PathBuf};
@@ -302,51 +302,61 @@ mod tests {
                 grading: GradingSection::new(GradingMode::Weighted,),
                 report: ReportSection::new(false, ReportOutput::Txt),
                 input: InputSection::default(),
-                sections: vec![TestSection::build(
-                    Some("Section 1".to_string()),
-                    Some(12),
-                    Some(
-                        UnitTests::build(
-                            vec![],
-                            false,
-                            vec![("file 1".to_string(), "content 1".to_string())],
-                            vec![],
-                            vec![],
-                            vec![UnitTest::build(
-                                None,
-                                Some("p1".to_string()),
-                                Some(
-                                    Table::build(
+                sections: vec![
+                    TestSection::build(
+                        Some("Section 1".to_string()),
+                        Some(12),
+                        Some(
+                            UnitTests::build(
+                                vec![],
+                                false,
+                                vec![("file 1".to_string(), "content 1".to_string())],
+                                vec![],
+                                vec![],
+                                vec![
+                                    UnitTest::build(
+                                        None,
+                                        Some("p1".to_string()),
+                                        Some(
+                                            Table::build(
+                                                vec![
+                                                    TableHeaderType::Args,
+                                                    TableHeaderType::Name,
+                                                    TableHeaderType::Stdout,
+                                                ],
+                                                vec![vec![
+                                                    TableCellContent::String(
+                                                        "arg1 arg2 arg3".to_string()
+                                                    ),
+                                                    TableCellContent::String("test1".to_string()),
+                                                    TableCellContent::String(
+                                                        "expected".to_string()
+                                                    ),
+                                                ]],
+                                            )
+                                            .unwrap()
+                                        ),
                                         vec![
-                                            TableHeaderType::Args,
-                                            TableHeaderType::Name,
-                                            TableHeaderType::Stdout,
+                                            DetailedTest::build(
+                                                Some("test2".to_string()),
+                                                Some("a1 a2 a3 a4".to_string()),
+                                                None,
+                                                None,
+                                                None,
+                                                Some(23),
+                                                Some(2),
+                                            )
+                                            .unwrap()
                                         ],
-                                        vec![vec![
-                                            TableCellContent::String("arg1 arg2 arg3".to_string()),
-                                            TableCellContent::String("test1".to_string()),
-                                            TableCellContent::String("expected".to_string()),
-                                        ]],
                                     )
                                     .unwrap()
-                                ),
-                                vec![DetailedTest::build(
-                                    Some("test2".to_string()),
-                                    Some("a1 a2 a3 a4".to_string()),
-                                    None,
-                                    None,
-                                    None,
-                                    Some(23),
-                                    Some(2),
-                                )
-                                .unwrap()],
+                                ],
                             )
-                            .unwrap()],
-                        )
-                        .unwrap()
-                    ),
-                )
-                .unwrap()],
+                            .unwrap()
+                        ),
+                    )
+                    .unwrap()
+                ],
                 executables_by_name: None,
             },
             GlobalConfig
