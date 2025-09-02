@@ -19,7 +19,7 @@ struct Cli {
 fn main() -> Result<(), Box<dyn std::error::Error>>{
 //    println!("Hello, world!, 10 - 4 = {}", cli_grader::subtract(10, 4));
 
-    let args = Cli::parse();
+    let _args = Cli::parse();
 
     let arg_table: Vec<String> = env::args().collect();
 
@@ -65,27 +65,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
 
 
 
-        // println!("config content: {}\n target_content: {}", config_content, target_content);
+        println!("config content: {}\n target_content: {}", config_content, target_content);
         
 
         // Should I check for file extension and start to implement Serde ??
-        
-
-
-
-
-
-
-
-
-
-
-
- 
     }
 
-
-    
     Ok(())
 
 }
