@@ -1,0 +1,283 @@
+use crate::{
+    config::test_section::unit_tests::UnitTests,
+    grader::{GradingTestSection, grading_tests::GradingTests},
+    input::ExecutableArtifact,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/*
+mod performance_tests;
+mod integration_tests;
+ */
+
+pub(crate) mod unit_tests;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct TestSectionUnchecked {
+    title: Option<String>,
+    weight: Option<u32>,
+    unit_tests: Option<UnitTests>,
+    // integration_tests: IntegrationTests,
+    // performance_tests: PerformanceTests,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum Tests {
+    UnitTests(UnitTests),
+    // IntegrationTests(IntegrationTests),
+    // PerformanceTests(PerformanceTests),
+}
+
+impl Tests {
+    fn build_grading_tests(
+        &self,
+        executables_by_name: &HashMap<String, ExecutableArtifact>,
+    ) -> Result<GradingTests, &'static str> {
+        match self {
+            Tests::UnitTests(unit_tests) => Ok(GradingTests::UnitTests(
+                unit_tests.build_grading_unit_tests(executables_by_name)?,
+            )),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(try_from = "TestSectionUnchecked", into = "TestSectionUnchecked")]
+pub struct TestSection {
+    title: Option<String>,
+    weight: Option<u32>,
+    tests: Tests,
+}
+
+impl From<TestSection> for TestSectionUnchecked {
+    fn from(val: TestSection) -> Self {
+        let TestSection {
+            title,
+            weight,
+            tests,
+        } = val;
+
+        match tests {
+            Tests::UnitTests(unit_tests) => TestSectionUnchecked {
+                title,
+                weight,
+                unit_tests: Some(unit_tests),
+            },
+        }
+    }
+}
+
+impl TestSection {
+    pub fn build(
+        title: Option<String>,
+        weight: Option<u32>,
+        unit_tests: Option<UnitTests>,
+    ) -> Result<Self, &'static str> {
+        if unit_tests.is_none() {
+            return Err("at least one type of test is expected in the TestSection");
+        }
+
+        Ok(Self {
+            title,
+            weight,
+            tests: Tests::UnitTests(unit_tests.expect("unit_tests is not none at this point")),
+        })
+    }
+
+    pub fn get_tests(&self) -> &Tests {
+        &self.tests
+    }
+
+    pub fn build_grading_section(
+        &self,
+        n: usize,
+        executables_by_name: &HashMap<String, ExecutableArtifact>,
+    ) -> Result<GradingTestSection, &'static str> {
+        let tests = self.tests.build_grading_tests(executables_by_name)?;
+        Ok(GradingTestSection::new(
+            self.title.clone().unwrap_or(format!("Section {n}")),
+            self.weight.unwrap_or(1),
+            tests,
+        ))
+    }
+
+    #[cfg(test)]
+    pub fn new_dummy(n: usize) -> Self {
+        Self {
+            title: Some(format!("Section {n}")),
+            weight: Some(1),
+            tests: Tests::UnitTests(UnitTests::new_dummy()),
+        }
+    }
+}
+
+impl TryFrom<TestSectionUnchecked> for TestSection {
+    type Error = &'static str;
+
+    fn try_from(value: TestSectionUnchecked) -> Result<Self, Self::Error> {
+        let TestSectionUnchecked {
+            title,
+            weight,
+            unit_tests,
+        } = value;
+
+        TestSection::build(title, weight, unit_tests)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod test_test_section {
+        use super::*;
+        use crate::config::test_macros::{
+            test_invalid_deserialization, test_serialize_and_deserialize,
+            test_valid_deserialization,
+        };
+
+        // serialization
+        test_serialize_and_deserialize!(
+            should_serialize_deserialize_full,
+            TestSection {
+                title: Some("section 1".to_string()),
+                weight: None,
+                tests: Tests::UnitTests(UnitTests::new_dummy())
+            },
+            TestSection
+        );
+        // invalid deserialization
+        test_invalid_deserialization!(should_panic_with_no_content_string, r#"\n"#, TestSection);
+        test_invalid_deserialization!(should_panic_with_empty_object, r#"{}"#, TestSection);
+        test_invalid_deserialization!(
+            should_panic_with_wrong_field,
+            r#"
+        {
+            "wrong field":123
+        }"#,
+            TestSection
+        );
+        test_invalid_deserialization!(
+            should_panic_without_tests,
+            r#"
+        {
+            "title":"sec 1",
+            "weight": 2
+        }"#,
+            TestSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_extra_field,
+            r#"
+        {
+            "title":"sec 1",
+            "weight": 2,
+            "extra":"field",
+            "unit_tests":{
+                "setup":["cmd1 abc"],
+                "tests": [
+                    {
+                        "title":"name 1",
+                        "program_name":"main",
+                        "detailed_tests":[
+                            {
+                                "args":"a1 a2 a3",
+                                "name":"test 1",
+                                "status":0,
+                                "stdout":"hello world"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        "#,
+            TestSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_wrong_field_name,
+            r#"
+        {
+            "title":"sec 1",
+            "weigt": 2,
+            "unit_tests":{
+                "setup":["cmd1 abc"],
+                "tests": [
+                    {
+                        "title":"name 1",
+                        "program_name":"main",
+                        "detailed_tests":[
+                            {
+                                "args":"a1 a2 a3",
+                                "name":"test 1",
+                                "status":0,
+                                "stdout":"hello world"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        "#,
+            TestSection
+        );
+        test_invalid_deserialization!(
+            should_panic_with_duplicated_field,
+            r#"
+        {
+            "title":"sec 1",
+            "weight": 2,
+            "weight": 2,
+            "unit_tests":{
+                "setup":["cmd1 abc"],
+                "tests": [
+                    {
+                        "title":"name 1",
+                        "program_name":"main",
+                        "detailed_tests":[
+                            {
+                                "args":"a1 a2 a3",
+                                "name":"test 1",
+                                "status":0,
+                                "stdout":"hello world"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        "#,
+            TestSection
+        );
+
+        // valid deserialization
+        test_valid_deserialization!(
+            should_accept_valid_section,
+            r#"
+        {
+            "title":"sec 1",
+            "weight": 2,
+            "unit_tests":{
+                "setup":["cmd1 abc"],
+                "tests": [
+                    {
+                        "title":"name 1",
+                        "program_name":"main",
+                        "detailed_tests":[
+                            {
+                                "args":"a1 a2 a3",
+                                "name":"test 1",
+                                "status":0,
+                                "stdout":"hello world"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        "#,
+            TestSection
+        );
+    }
+}
