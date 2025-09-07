@@ -6,6 +6,7 @@ mod config;
 #[allow(dead_code)]
 mod input;
 mod report;
+pub(crate) mod utils;
 
 pub use grader::Grader;
 pub use grader::GradingConfig;
