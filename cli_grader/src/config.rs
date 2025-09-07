@@ -905,7 +905,6 @@ mod tests {
         mod test_initialize {
             use super::*;
             use crate::config::input_section::{InputType, ProgramSpecification};
-            use tempfile::NamedTempFile;
 
             #[test]
             #[should_panic]
