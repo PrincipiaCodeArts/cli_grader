@@ -4,6 +4,7 @@
 //! Everything related to how to execute some artifact or if the artifact is even valid,
 //! will be implemented here.
 
+use is_executable::is_executable;
 use std::{fmt::Debug, path::PathBuf, process::Command};
 
 /// This is the common interface to represent anything that may is executable and thus
@@ -35,7 +36,11 @@ impl ExecutableArtifact {
     ) -> Result<Self, &'static str> {
         match program_type {
             ProgramType::Compiled => {
-                // validate program
+                // try to read it as file
+                if !is_executable(&path) {
+                    return Err("path does not point to an executable");
+                }
+
                 Ok(ExecutableArtifact::CompiledProgram { name, path })
             }
         }
@@ -55,9 +60,37 @@ impl ExecutableArtifact {
 
     #[cfg(test)]
     pub fn new_dummy(n: usize) -> Self {
+        use tempfile::NamedTempFile;
+
+        let path = NamedTempFile::new().unwrap();
+        let path = path.path();
         Self::CompiledProgram {
             name: format!("program{n}"),
-            path: PathBuf::from(format!("path{n}")),
+            path: PathBuf::from(path),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utils;
+    use std::str::FromStr;
+
+    #[test]
+    fn should_build_a_valid_executable() {
+        let path = utils::create_dummy_executable();
+        ExecutableArtifact::build("some name".to_string(), path, ProgramType::Compiled).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn should_fail_to_build_an_invalid_executable() {
+        ExecutableArtifact::build(
+            "some name".to_string(),
+            PathBuf::from_str("invalid_path").unwrap(),
+            ProgramType::Compiled,
+        )
+        .unwrap();
     }
 }

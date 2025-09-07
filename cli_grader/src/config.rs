@@ -1088,12 +1088,20 @@ mod tests {
                 .unwrap();
                 // TODO (refactor error handling): when error handling is refactored, this
                 // test will check for specific test instead of only checking for panicking.
+
+                use crate::utils;
+                let p1 = utils::create_dummy_executable();
+                let p3 = utils::create_dummy_executable();
+                let p_java = utils::create_dummy_executable();
+                let p_py = utils::create_dummy_executable();
+                let p_rs = utils::create_dummy_executable();
+
                 c.initialize(&[
-                    ("p1", PathBuf::from("p1")),
-                    ("program3", PathBuf::from("p3")),
-                    ("java", PathBuf::from("p.java")),
-                    ("python", PathBuf::from("p.py")),
-                    ("rust", PathBuf::from("p.rs")),
+                    ("p1", p1),
+                    ("program3", p3),
+                    ("java", p_java),
+                    ("python", p_py),
+                    ("rust", p_rs),
                 ])
                 .unwrap();
             }
